@@ -3,15 +3,14 @@ services:
   # ============================================================
   # DEVCONTAINER
   # ============================================================
-  dev:
+  devcontainer:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
-    container_name: medbox_dev
+    container_name: devcontainer
     command: sleep infinity
     volumes:
-      - ..:/workspace
-    working_dir: /workspace
+      - ../..:/workspaces:cached
     environment:
       DATABASE_URL: postgresql+asyncpg://medbox:medbox@postgres:5432/medbox
       REDIS_URL: redis://redis:6379
@@ -23,10 +22,10 @@ services:
       - redis
       - keycloak
       - garage
-      - garage-init
-      - garage-setup
     networks:
       - medbox
+    ports:
+      - "8000:8000"
 
   # ============================================================
   # MAIN POSTGRES (MEDBOX DATA)

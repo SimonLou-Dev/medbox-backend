@@ -1,23 +1,59 @@
 [tool.poetry]
-name = "monprojet"
+name = "medbox"
 version = "0.1.0"
-description = ""
-authors = ["Moi <moi@example.com>"]
-readme = "README.md"
-packages = [{ include = "src" }]
+description = "Medbox backend (API + Worker)"
+authors = ["Simon"]
+packages = [
+    { include = "medbox" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"
 
+# --- Core API ---
+fastapi = "0.110.0"
+uvicorn = { version = "0.29.0", extras = ["standard"] }
+
+# --- Auth / Keycloak ---
+python-jose = "3.3.0"
+authlib = "1.3.0"
+python-keycloak = "2.9.0"
+
+# --- ORM / Database ---
+SQLAlchemy = "2.0.25"
+asyncpg = "0.29.0"
+alembic = "1.13.1"
+
+# --- Schemas / Validation ---
+pydantic = "2.6.1"
+pydantic-settings = "2.2.1"
+
+# --- Security / Crypto ---
+cryptography = "42.0.5"
+passlib = { version = "1.7.4", extras = ["bcrypt"] }
+
+# --- Logging ---
+structlog = "24.1.0"
+
+# --- Async Utils ---
+aiohttp = "3.9.1"
+redis = "5.0.1"
+tenacity = "8.2.3"
+
+# --- Task Queue ---
+dramatiq = "1.15.0"
+
+
+[tool.poetry.scripts]
+api = "medbox.api.main:run"
+api-dev = "medbox.api.main:run_dev"
+worker = "medbox.worker.__main__:run"
+
+
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.6.0"
 pytest = "^8.0"
+pytest-asyncio = "^0.23"
+ruff = "^0.6"
+httpx = "^0.27"
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
 
-[tool.ruff]
-line-length = 120
-select = ["E", "F", "W", "I"]
-ignore = []
