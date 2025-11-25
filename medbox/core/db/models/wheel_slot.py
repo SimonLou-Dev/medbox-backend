@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
 from ._mixins import IDMixin, TimestampMixin
+from ..types import EncryptedString
 
 
 class WheelSlot(Base, IDMixin, TimestampMixin):
@@ -28,7 +29,7 @@ class WheelSlot(Base, IDMixin, TimestampMixin):
     )
 
     c_label: Mapped[str | None] = mapped_column(
-        String(255),
+        EncryptedString(),
         nullable=True,
         doc="Label chiffré éventuel (ex: matin, midi...)",
     )

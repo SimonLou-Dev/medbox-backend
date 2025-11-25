@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
 from ._mixins import IDMixin, TimestampMixin
+from ..types import EncryptedString
 
 
 class Patient(Base, IDMixin, TimestampMixin):
@@ -24,10 +25,10 @@ class Patient(Base, IDMixin, TimestampMixin):
     external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Données sensibles chiffrées
-    c_first_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    c_last_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    c_address: Mapped[str | None] = mapped_column(String(1024), nullable=True)
-    c_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    c_first_name: Mapped[str] = mapped_column(EncryptedString(), nullable=False)
+    c_last_name: Mapped[str] = mapped_column(EncryptedString(), nullable=False)
+    c_address: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
+    c_phone: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
 
     birth_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
 

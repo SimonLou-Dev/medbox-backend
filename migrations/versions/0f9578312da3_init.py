@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 01a7c14593ef
+Revision ID: 0f9578312da3
 Revises: 
-Create Date: 2025-11-25 13:50:18.409359
+Create Date: 2025-11-25 14:16:28.358613
 
 """
 from typing import Sequence, Union
@@ -10,9 +10,10 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
+from  medbox.core.db.types import EncryptedString
 
 # revision identifiers, used by Alembic.
-revision: str = '01a7c14593ef'
+revision: str = '0f9578312da3'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -43,10 +44,10 @@ def upgrade() -> None:
     op.create_table('patients',
     sa.Column('tenant_id', sa.Uuid(), nullable=False),
     sa.Column('external_id', sa.String(length=255), nullable=True),
-    sa.Column('c_first_name', sa.String(length=255), nullable=False),
-    sa.Column('c_last_name', sa.String(length=255), nullable=False),
-    sa.Column('c_address', sa.String(length=1024), nullable=True),
-    sa.Column('c_phone', sa.String(length=50), nullable=True),
+    sa.Column('c_first_name', EncryptedString(), nullable=False),
+    sa.Column('c_last_name', EncryptedString(), nullable=False),
+    sa.Column('c_address', EncryptedString(), nullable=True),
+    sa.Column('c_phone', EncryptedString(), nullable=True),
     sa.Column('birth_date', sa.DateTime(), nullable=True),
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
@@ -55,10 +56,10 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('users',
-    sa.Column('tenant_id', sa.Uuid(), nullable=False),
+    sa.Column('tenant_id', sa.Uuid(), nullable=True),
     sa.Column('keycloak_subject', sa.String(length=255), nullable=False),
     sa.Column('email', sa.String(length=320), nullable=False),
-    sa.Column('c_full_name', sa.String(length=512), nullable=True),
+    sa.Column('c_full_name', EncryptedString(), nullable=True),
     sa.Column('role', sa.String(length=50), nullable=False),
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
@@ -91,7 +92,7 @@ def upgrade() -> None:
     sa.Column('patient_id', sa.Uuid(), nullable=False),
     sa.Column('created_by_user_id', sa.Uuid(), nullable=True),
     sa.Column('title', sa.String(length=255), nullable=True),
-    sa.Column('c_notes', sa.String(length=2048), nullable=True),
+    sa.Column('c_notes', EncryptedString(), nullable=True),
     sa.Column('status', sa.String(length=50), nullable=False),
     sa.Column('start_date', sa.DateTime(timezone=True), nullable=True),
     sa.Column('end_date', sa.DateTime(timezone=True), nullable=True),
@@ -165,7 +166,7 @@ def upgrade() -> None:
     op.create_table('wheel_slots',
     sa.Column('wheel_id', sa.Uuid(), nullable=False),
     sa.Column('index', sa.Integer(), nullable=False),
-    sa.Column('c_label', sa.String(length=255), nullable=True),
+    sa.Column('c_label', EncryptedString(), nullable=True),
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),

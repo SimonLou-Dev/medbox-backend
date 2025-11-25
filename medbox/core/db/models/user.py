@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
 from ._mixins import IDMixin, TimestampMixin
+from ..types import EncryptedString
 
 
 class User(Base, IDMixin, TimestampMixin):
@@ -22,7 +23,7 @@ class User(Base, IDMixin, TimestampMixin):
 
     keycloak_subject: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(320), nullable=False)
-    c_full_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    c_full_name: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
 
     role: Mapped[str] = mapped_column(
         String(50),

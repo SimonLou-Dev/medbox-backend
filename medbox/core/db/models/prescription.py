@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
 from ._mixins import IDMixin, TimestampMixin
+from ..types import EncryptedString
 
 
 class Prescription(Base, IDMixin, TimestampMixin):
@@ -34,7 +35,7 @@ class Prescription(Base, IDMixin, TimestampMixin):
     )
 
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    c_notes: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    c_notes: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
 
     status: Mapped[str] = mapped_column(
         String(50),

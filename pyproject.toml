@@ -53,8 +53,8 @@ worker = "medbox.worker.__main__:run"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
-pytest-asyncio = "^0.23"
 ruff = "^0.6"
 httpx = "^0.27"
+pytest-asyncio = "^1.3.0"
 
 
