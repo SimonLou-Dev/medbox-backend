@@ -20,16 +20,25 @@ async def login(
         security: SecurityService = Depends(get_security_service),
 ):
     """Redirige vers Keycloak pour login."""
-    state = urllib.parse.quote_plus(redirect_uri) if redirect_uri else ""
-    backend_uri=f"{settings.app_url}{settings.url_prefix}/v1/oauth2/callback"
 
-    auth_url = (
-        f"{security.authorization_endpoint}"
-        f"?client_id={settings.keycloak_client_id}"
-        f"&response_type=code&scope=openid profile email"
-        f"&redirect_uri={urllib.parse.quote_plus(backend_uri)}"
-        f"&state={state}"
-    )
+    backend_uri=f"{settings.app_url}{settings.url_prefix}/v1/oauth2/callback"
+    auth_url = None
+    if redirect_uri:
+        state = urllib.parse.quote_plus(redirect_uri)
+        auth_url = (
+            f"{security.authorization_endpoint}"
+            f"?client_id={settings.keycloak_client_id}"
+            f"&response_type=code&scope=openid profile email"
+            f"&redirect_uri={urllib.parse.quote_plus(backend_uri)}"
+            f"&state={state}"
+        )
+    else:
+        auth_url = (
+            f"{security.authorization_endpoint}"
+            f"?client_id={settings.keycloak_client_id}"
+            f"&response_type=code&scope=openid profile email"
+            f"&redirect_uri={urllib.parse.quote_plus(backend_uri)}"
+        )
     return RedirectResponse(auth_url)
 
 
