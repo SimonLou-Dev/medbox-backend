@@ -48,6 +48,9 @@ class Settings(BaseSettings):
         alias="ENCRYPTION_KEY"
     )
 
+    app_url: str = Field(alias="APP_URL", default="http://localhost:8000")
+    url_prefix: str = Field(alias="URL_PREFIX", default="/api")
+
     # --- Misc ---
     environment: str = "development"
 

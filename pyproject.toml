@@ -48,7 +48,8 @@ psycopg2-binary = "^2.9.11"
 [tool.poetry.scripts]
 api = "medbox.api.main:run"
 api-dev = "medbox.api.main:run_dev"
-worker = "medbox.worker.__main__:run"
+scheduler-worker = "medbox.scheduler-worker.__main__:run"
+iot-worker = "medbox.iot-worker.__main__:run"
 
 
 [tool.poetry.group.dev.dependencies]

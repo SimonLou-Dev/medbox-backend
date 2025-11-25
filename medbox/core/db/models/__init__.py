@@ -15,6 +15,7 @@ from .prescription import Prescription
 from .prescription_item import PrescriptionItem
 from .event import Event
 from .telemetry import Telemetry
+from .invitation import Invitation
 
 __all__ = [
     "Base",
@@ -30,4 +31,5 @@ __all__ = [
     "PrescriptionItem",
     "Event",
     "Telemetry",
+    "Invitation"
 ]

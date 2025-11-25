@@ -76,7 +76,7 @@ services:
   # KEYCLOAK
   # ============================================================
   keycloak:
-    image: quay.io/keycloak/keycloak:25.0
+    image: quay.io/keycloak/keycloak:26.4
     container_name: medbox_keycloak
     command: start-dev
     environment:
@@ -135,6 +135,23 @@ services:
     networks:
       - medbox
 
+  # ============================================================
+  # GARAGE (S3)
+  # ============================================================
+
+  emqx:
+    image: emqx:latest
+    restart: always
+    environment:
+      EMQX_NODE__NAME: foo_emqx@127.0.0.1
+    volumes:
+      - vol-emqx-data:/opt/emqx/data
+      - vol-emqx-log:/opt/emqx/log
+    networks:
+      - medbox
+    ports:
+      - "18083:18083"
+      - "1883:1883"
 networks:
   medbox:
 
@@ -144,3 +161,5 @@ volumes:
   garage_meta:
   garage_data:
   keycloak_pg_data:
+  vol-emqx-data:
+  vol-emqx-log:
