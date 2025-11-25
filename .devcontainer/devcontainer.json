@@ -3,6 +3,5 @@
   "dockerComposeFile": "docker-compose.yaml",
   "service": "devcontainer",
   "remoteUser": "vscode",
-  "postCreateCommand": "poetry install && poetry run ruff --version",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}"
 }
