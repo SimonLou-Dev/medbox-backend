@@ -1,0 +1,48 @@
+# --- Core API ---
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+
+# --- Auth / Keycloak ---
+python-jose==3.3.0
+authlib==1.3.0
+python-keycloak==2.9.0
+
+# --- ORM / Database ---
+SQLAlchemy==2.0.25
+asyncpg==0.29.0
+alembic==1.13.1
+
+# --- Schemas / Validation ---
+pydantic==2.6.1
+pydantic-settings==2.2.1
+
+# --- Security / Crypto ---
+cryptography==42.0.5
+passlib[bcrypt]==1.7.4
+
+# --- Observability ---
+opentelemetry-api==1.23.0
+opentelemetry-sdk==1.23.0
+opentelemetry-exporter-otlp==1.23.0
+opentelemetry-instrumentation-fastapi==0.46b0
+opentelemetry-instrumentation-asyncpg==0.46b0
+opentelemetry-instrumentation-sqlalchemy==0.46b0
+
+# --- Logging ---
+structlog==24.1.0
+
+# --- Async Utils ---
+aiohttp==3.9.1
+redis==5.0.1  # cache, rate limiting, sessions
+tenacity==8.2.3  # retry robustes
+
+# --- Task Queue ---
+dramatiq==1.15.0
+
+# --- Optional Dev Tools ---
+pytest==8.0.2
+pytest-asyncio==0.23.5
+httpx==0.27.0
+ruff==0.3.0
+
+

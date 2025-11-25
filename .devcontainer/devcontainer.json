@@ -1,0 +1,6 @@
+{
+  "name": "medbox-dev",
+  "dockerComposeFile": "docker-compose.yml",
+  "remoteUser": "vscode",
+  "postCreateCommand": "poetry install && poetry run ruff --version"
+}

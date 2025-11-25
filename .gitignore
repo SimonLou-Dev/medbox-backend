@@ -1,0 +1,95 @@
+# ===========================================
+# PYTHON
+# ===========================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyd
+*.pkl
+*.db
+
+# venv
+.venv/
+env/
+venv/
+
+# Pydantic cache
+.pytest_cache/
+.pyre/
+
+# ===========================================
+# EDITOR / IDE
+# ===========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===========================================
+# DEVCONTAINER
+# ===========================================
+.devcontainer/.env
+.devcontainer/cache/
+.devcontainer/Dockerfile.*
+.devcontainer/docker-compose.override.yml
+
+# Avoid committing VSCode internal devcontainer metadata
+.devcontainer/.welcome-msg
+.devcontainer/devcontainer.json-backup
+
+# ===========================================
+# DOCKER
+# ===========================================
+# docker build cache
+docker-compose.override.yml
+*.log
+logs/
+
+# Docker run artifacts
+tmp/
+*.pid
+*.sock
+
+# ===========================================
+# OPENAPI / GENERATED FILES
+# ===========================================
+openapi.json
+openapi.yaml
+
+# ===========================================
+# TESTS
+# ===========================================
+.coverage
+htmlcov/
+coverage.xml
+.cache/
+pytestdebug.log
+
+# ===========================================
+# BUILD ARTIFACTS
+# ===========================================
+build/
+dist/
+*.egg-info/
+.mypy_cache/
+
+
+
+# ===========================================
+# KEYS / SECRETS (NEVER COMMIT)
+# ===========================================
+*.pem
+*.key
+*.crt
+*.der
+*.csr
+*.p12
+*.env
+.env*
+*.token
+secrets/
+secret/
+config/secrets/
+
+# =============

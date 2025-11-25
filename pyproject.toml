@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "monprojet"
+version = "0.1.0"
+description = ""
+authors = ["Moi <moi@example.com>"]
+readme = "README.md"
+packages = [{ include = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.6.0"
+pytest = "^8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+select = ["E", "F", "W", "I"]
+ignore = []

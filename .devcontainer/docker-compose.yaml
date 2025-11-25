@@ -1,0 +1,147 @@
+
+services:
+  # ============================================================
+  # DEVCONTAINER
+  # ============================================================
+  dev:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    container_name: medbox_dev
+    command: sleep infinity
+    volumes:
+      - ..:/workspace
+    working_dir: /workspace
+    environment:
+      DATABASE_URL: postgresql+asyncpg://medbox:medbox@postgres:5432/medbox
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT_URL: http://garage:3900
+      PYTHONPATH: /workspace
+      KEYCLOAK_URL: http://keycloak:8080
+    depends_on:
+      - postgres
+      - redis
+      - keycloak
+      - garage
+      - garage-init
+      - garage-setup
+    networks:
+      - medbox
+
+  # ============================================================
+  # MAIN POSTGRES (MEDBOX DATA)
+  # ============================================================
+  postgres:
+    image: postgres:15
+    container_name: medbox_postgres
+    environment:
+      POSTGRES_DB: medbox
+      POSTGRES_USER: medbox
+      POSTGRES_PASSWORD: medbox
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - medbox
+
+  # ============================================================
+  # REDIS
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: medbox_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - medbox
+
+  # ============================================================
+  # KEYCLOAK DATABASE
+  # ============================================================
+  keycloak_pg:
+    image: postgres:15
+    container_name: medbox_keycloak_pg
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak123
+    volumes:
+      - keycloak_pg_data:/var/lib/postgresql/data
+    networks:
+      - medbox
+
+  # ============================================================
+  # KEYCLOAK
+  # ============================================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: medbox_keycloak
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak_pg:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak123
+
+      KC_HOSTNAME: localhost
+      KC_HTTP_PORT: 8080
+
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+
+    ports:
+      - "8080:8080"
+    depends_on:
+      - keycloak_pg
+    networks:
+      - medbox
+
+  # ============================================================
+  # GARAGE (S3)
+  # ============================================================
+  garage:
+    image: dxflrs/garage:v2.0.0
+    container_name: garage
+    volumes:
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
+      - ./garage.toml:/etc/garage.toml:ro
+    restart: unless-stopped
+    ports:
+      - "3900:3900"
+      - "3901:3901"
+      - "3902:3902"
+      - "3903:3903"
+    networks:
+      - medbox
+
+
+
+  # ============================================================
+  # GARAGE WEB UI
+  # ============================================================
+  webui:
+    image: khairul169/garage-webui:latest
+    container_name: garage-webui
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+    ports:
+      - "3909:3909"
+    environment:
+      API_BASE_URL: "http://garage:3903"
+      S3_ENDPOINT_URL: "http://garage:3900"
+    networks:
+      - medbox
+
+networks:
+  medbox:
+
+volumes:
+  postgres_data:
+  redis_data:
+  garage_meta:
+  garage_data:
+  keycloak_pg_data:

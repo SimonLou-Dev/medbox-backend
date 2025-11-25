@@ -1,0 +1,30 @@
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "sqlite"
+metadata_auto_snapshot_interval = "6h"
+
+replication_factor = 1
+compression_level = 2
+
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "garage:3901"
+rpc_secret = "a7d3c6f4ff793ae4e72b3a97cb972eba5f8da3f9e537bde182f4b4b1fa16cd42"
+
+[s3_api]
+api_bind_addr = "[::]:3900"
+s3_region = "garage"
+root_domain = ".garage.local"
+
+# ========== CLES S3 ==========
+[s3_keys.dev]
+secret_key = "dev"
+
+[s3_web]
+bind_addr = "[::]:3902"
+root_domain = ".garage-web.local"
+index = "index.html"
+
+[admin]
+api_bind_addr = "[::]:3903"
+admin_token = "dev-admin-token-123456789"
+metrics_token = "dev-metrics-token-123456789"
