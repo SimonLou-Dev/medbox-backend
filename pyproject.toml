@@ -42,6 +42,7 @@ tenacity = "8.2.3"
 
 # --- Task Queue ---
 dramatiq = "1.15.0"
+psycopg2-binary = "^2.9.11"
 
 
 [tool.poetry.scripts]
