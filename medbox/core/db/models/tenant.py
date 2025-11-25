@@ -20,4 +20,5 @@ class Tenant(Base, IDMixin, TimestampMixin):
     prescriptions: Mapped[list["Prescription"]] = relationship(back_populates="tenant")
     events: Mapped[list["Event"]] = relationship(back_populates="tenant")
     telemetry: Mapped[list["Telemetry"]] = relationship(back_populates="tenant")
+    invitations: Mapped[list["Invitation"]] = relationship(back_populates="tenant")
 

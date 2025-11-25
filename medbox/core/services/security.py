@@ -7,11 +7,17 @@ from typing import Any, Dict, Optional, List
 import httpx
 from authlib.jose import JsonWebKey, jwt
 from fastapi import HTTPException, Request, Response, Depends
+from fastapi.security import OAuth2AuthorizationCodeBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from pydantic import BaseModel
 from starlette import status
 
 from medbox.core.config.settings import settings
+
+oauth2_scheme = OAuth2AuthorizationCodeBearer(
+    authorizationUrl=f"{settings.keycloak_url}/realms/{settings.keycloak_realm}/protocol/openid-connect/auth",
+    tokenUrl=f"{settings.keycloak_url}/realms/{settings.keycloak_realm}/protocol/openid-connect/token",
+)
 
 class SecurityService:
     """
@@ -96,9 +102,9 @@ class SecurityService:
                 data={
                     "grant_type": "authorization_code",
                     "code": code,
-                    "client_id": settings.KEYCLOAK_CLIENT_ID,
-                    "client_secret": settings.KEYCLOAK_CLIENT_SECRET,
-                    "redirect_uri": f"{settings.APP_URL}{settings.URL_PREFIX}/auth/callback",
+                    "client_id": settings.keycloak_client_id,
+                    "client_secret": settings.keycloak_client_secret,
+                    "redirect_uri": f"{settings.app_url}{settings.url_prefix}/v1/oauth2/callback",
                 },
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
@@ -108,7 +114,8 @@ class SecurityService:
 
         tokens = resp.json()
         claims = await self.decode_token(tokens["access_token"])
-        return claims, tokens["access_token"], tokens.get("refresh_token")
+        ctx = LightWeightUserContext(claims=claims)
+        return ctx, tokens["access_token"], tokens.get("refresh_token")
 
     # ------------------------------------------------------------------
     # Refresh
@@ -214,13 +221,19 @@ class SecurityService:
 
         return None
 
-class UserContext(BaseModel):
+class LightWeightUserContext(BaseModel):
     claims: Dict[str, Any]
-    token: str
-
     @property
     def subject(self) -> str:
         return self.claims.get("sub")
+
+    @property
+    def username(self) -> str:
+        return self.claims.get("username")
+    
+    @property
+    def full_name(self) -> str:
+        return self.claims.get("given_name") + " " + self.claims.get("family_name").upper()
 
     @property
     def email(self) -> str | None:
@@ -230,6 +243,11 @@ class UserContext(BaseModel):
     def roles(self) -> List[str]:
         svc = SecurityService()  # pas idéal mais ok pour les getters
         return svc.get_roles(self.claims)
+
+class UserContext(LightWeightUserContext):
+    token: str
+
+
 
 def get_security_service() -> SecurityService:
     return SecurityService()

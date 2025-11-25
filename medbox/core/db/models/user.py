@@ -1,6 +1,6 @@
 import uuid
 
-from keycloak.authorization import Role
+
 from sqlalchemy import ForeignKey, String, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,7 +18,7 @@ class User(Base, IDMixin, TimestampMixin):
 
     __tablename__ = 'users'
 
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
+    tenant_id: Mapped[uuid.UUID|None] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=True,
     )
@@ -34,7 +34,7 @@ class User(Base, IDMixin, TimestampMixin):
     )
 
     role: Mapped[UserRoles] = mapped_column(
-        SAEnum(Role),
+        SAEnum(UserRoles),
         nullable=False,
         default=UserRoles.DEFAULT,
     )
