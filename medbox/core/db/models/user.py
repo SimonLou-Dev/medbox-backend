@@ -17,7 +17,7 @@ class User(Base, IDMixin, TimestampMixin):
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
 
     keycloak_subject: Mapped[str] = mapped_column(String(255), nullable=False)
