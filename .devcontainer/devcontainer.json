@@ -3,5 +3,32 @@
   "dockerComposeFile": "docker-compose.yaml",
   "service": "devcontainer",
   "remoteUser": "vscode",
-  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}"
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "zeshuaro.vscode-python-poetry",
+        "donjayamanne.python-extension-pack",
+        "charliermarsh.ruff"
+      ],
+      "settings": {
+        "[python]": {
+          "editor.codeActionsOnSave": {
+              "source.fixAll.ruff": "always",
+              "source.organizeImports.ruff": "always",
+              "source.convertImportFormat": "always"
+          },
+          "editor.formatOnSave": true,
+          "editor.formatOnType": true,
+          "editor.defaultFormatter": "charliermarsh.ruff"
+        },
+        "ruff.lint.select": [
+            "ALL"
+        ],
+        "files.exclude": {
+            "**/__pycache__": true
+        }
+      }
+    }
+  }
 }

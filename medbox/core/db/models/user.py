@@ -1,24 +1,23 @@
+"""Modèle d'un utilsiateur."""
+
 import uuid
 
-
-from sqlalchemy import ForeignKey, String, Enum as SAEnum
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from medbox.core.constants.enums import UserRoles, UserStatus
 from medbox.core.db.base import Base
-from ._mixins import IDMixin, TimestampMixin
-from ..types import EncryptedString
-from ...constants.enums import InviteStatus, UserStatus, UserRoles
+from medbox.core.db.models._mixins import IDMixin, TimestampMixin
+from medbox.core.db.types import EncryptedString
 
 
 class User(Base, IDMixin, TimestampMixin):
-    """
-    Utilisateur logique Medbox (lié à Keycloak via subject_id).
-    Pas de mot de passe ici, tout est externalisé.
-    """
+    """Utilisateur logique Medbox (lié à Keycloak via subject_id)."""
 
-    __tablename__ = 'users'
+    __tablename__ = "users"
 
-    tenant_id: Mapped[uuid.UUID|None] = mapped_column(
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=True,
     )
@@ -40,7 +39,5 @@ class User(Base, IDMixin, TimestampMixin):
     )
     tenant: Mapped["Tenant"] = relationship(back_populates="users")
     created_prescriptions: Mapped[list["Prescription"]] = relationship(
-        back_populates="created_by"
+        back_populates="created_by",
     )
-
-

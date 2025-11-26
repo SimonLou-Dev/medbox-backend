@@ -3,47 +3,50 @@ name = "medbox"
 version = "0.1.0"
 description = "Medbox backend (API + Worker)"
 authors = ["Simon"]
-packages = [
-    { include = "medbox" }
-]
+packages = [{ include = "medbox" }]
 
 [tool.poetry.dependencies]
 python = "^3.11"
 
-# --- Core API ---
+# Core API
 fastapi = "0.110.0"
 uvicorn = { version = "0.29.0", extras = ["standard"] }
 
-# --- Auth / Keycloak ---
+# Auth / Keycloak
 python-jose = "3.3.0"
 authlib = "1.3.0"
 python-keycloak = "2.9.0"
 
-# --- ORM / Database ---
+# ORM / Database
 SQLAlchemy = "2.0.25"
 asyncpg = "0.29.0"
 alembic = "1.13.1"
+psycopg2-binary = "^2.9.11"
 
-# --- Schemas / Validation ---
-pydantic = "2.6.1"
+# Schemas / Validation
+pydantic = {extras = ["email"], version = "^2.12.4"}
 pydantic-settings = "2.2.1"
 
-# --- Security / Crypto ---
+# Security / Crypto
 cryptography = "42.0.5"
 passlib = { version = "1.7.4", extras = ["bcrypt"] }
 
-# --- Logging ---
+# Logging
 structlog = "24.1.0"
 
-# --- Async Utils ---
+# Async Utils
 aiohttp = "3.9.1"
 redis = "5.0.1"
 tenacity = "8.2.3"
 
-# --- Task Queue ---
+# Task Queue
 dramatiq = "1.15.0"
-psycopg2-binary = "^2.9.11"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+pytest-asyncio = "^1.3.0"
+httpx = "^0.27"
+ruff = "^0.6"
 
 [tool.poetry.scripts]
 api = "medbox.api.main:run"
@@ -51,11 +54,73 @@ api-dev = "medbox.api.main:run_dev"
 scheduler-worker = "medbox.scheduler-worker.__main__:run"
 iot-worker = "medbox.iot-worker.__main__:run"
 
+# ============================================================================
+# RUFF CONFIGURATION
+# ============================================================================
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.0"
-ruff = "^0.6"
-httpx = "^0.27"
-pytest-asyncio = "^1.3.0"
+[tool.ruff]
+target-version = "py311"
+line-length = 88
 
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    "build",
+    "dist",
+    "migrations",
+]
 
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "B",     # flake8-bugbear
+    "C4",    # flake8-comprehensions
+    "UP",    # pyupgrade
+    "ARG",   # flake8-unused-arguments
+    "SIM",   # flake8-simplify
+    "PTH",   # flake8-use-pathlib
+    "RUF",   # Ruff-specific rules
+    "ASYNC", # flake8-async
+    "S",     # flake8-bandit (sécurité)
+    "T20",   # flake8-print
+]
+
+ignore = [
+    "E501",   # line too long (géré par le formateur)
+    "B008",   # function calls in argument defaults (normal avec FastAPI)
+    "S101",   # use of assert (utile pour les tests)
+    "ARG001", # unused function argument
+    "ARG002", # unused method argument (courant pour les dépendances FastAPI)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]
+"tests/*" = ["S101", "ARG001", "ARG002"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["medbox"]
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"

@@ -1,124 +1,265 @@
-# medbox/api/routes/auth_router_v1.py
+"""Router pour l'authentification OAuth2 via Keycloak."""
 
 import urllib.parse
-from fastapi import APIRouter, Depends, Query, HTTPException, Cookie, Security
-from fastapi.responses import RedirectResponse, JSONResponse
-from pydantic import BaseModel
+from typing import Annotated
 
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
+from fastapi.responses import JSONResponse, RedirectResponse
+
+from medbox.api.dto.auth import MeResponse, RefreshTokenRequest, TokenResponse
 from medbox.core.config.settings import settings
 from medbox.core.services.security import (
-    SecurityService,
-    get_security_service, UserContext, require_user, oauth2_scheme,
+    CurrentUser,
+    SecurityDep,
 )
 from medbox.core.services.user import UserService
 
 router = APIRouter(prefix="/oauth2", tags=["OAuth2"])
 
+# ==============================================================================
+# Type Aliases
+# ==============================================================================
 
-@router.get("/")
+UserServiceDep = Annotated[UserService, Depends(UserService)]
+
+# ==============================================================================
+# Routes
+# ==============================================================================
+
+
+@router.get("/login")
 async def login(
-        redirect_uri: str = Query(None),
-        security: SecurityService = Depends(get_security_service),
-):
-    """Redirige vers Keycloak pour login."""
+    security: SecurityDep,
+    redirect_uri: Annotated[str | None, Query()] = None,
+) -> RedirectResponse:
+    """Redirige vers la page de connexion Keycloak.
 
-    backend_uri=f"{settings.app_url}{settings.url_prefix}/v1/oauth2/callback"
-    auth_url = None
+    Args:
+        security: Service de gestion de l'auth
+        redirect_uri: URL de redirection après authentification (optionnel)
+
+    Returns:
+        Redirection vers Keycloak
+
+    """
+    backend_callback = f"{settings.app_url}{settings.url_prefix}/v1/oauth2/callback"
+
+    # Paramètres de base
+    params = {
+        "client_id": settings.keycloak_client_id,
+        "response_type": "code",
+        "scope": "openid profile email",
+        "redirect_uri": backend_callback,
+    }
+
+    # Ajouter le state si redirect_uri fourni
     if redirect_uri:
-        state = urllib.parse.quote_plus(redirect_uri)
-        auth_url = (
-            f"{security.authorization_endpoint}"
-            f"?client_id={settings.keycloak_client_id}"
-            f"&response_type=code&scope=openid profile email"
-            f"&redirect_uri={urllib.parse.quote_plus(backend_uri)}"
-            f"&state={state}"
-        )
-    else:
-        auth_url = (
-            f"{security.authorization_endpoint}"
-            f"?client_id={settings.keycloak_client_id}"
-            f"&response_type=code&scope=openid profile email"
-            f"&redirect_uri={urllib.parse.quote_plus(backend_uri)}"
-        )
+        params["state"] = redirect_uri
+
+    query_string = urllib.parse.urlencode(params)
+    auth_url = f"{security.authorization_endpoint}?{query_string}"
+
     return RedirectResponse(auth_url)
 
 
 @router.get("/callback")
 async def callback(
-        code: str,
-        state: str | None = None,
-        security: SecurityService = Depends(get_security_service),
-        user_service: UserService = Depends(UserService)
-):
-    """Callback Keycloak → échange code contre token"""
+    code: Annotated[str, Query()],
+    security: SecurityDep,
+    user_service: UserServiceDep,
+    state: Annotated[str | None, Query()] = None,
+) -> Response:
+    """Retour OAuth2 après authentification Keycloak.
 
+    Échange le code d'autorisation contre des tokens et enregistre l'utilisateur.
+
+    Args:
+        security: Service de gestion de l'auth
+        user_service: Service de gestion de l'utilisateur
+        code: Code d'autorisation OAuth2
+        state: URL de redirection encodée (optionnel)
+
+    Returns:
+        Redirection vers l'URL du state ou JSON avec les tokens
+
+    """
+    # Échange du code contre les tokens
     ctx, access_token, refresh_token = await security.exchange_code(code)
 
+    # Enregistrement/mise à jour de l'utilisateur en DB
     await user_service.register_user(ctx)
 
-
-    # Si "state" contient une URL → redirect vers cette URL
+    # Préparer la réponse (redirect ou JSON)
     if state:
         redirect_url = urllib.parse.unquote_plus(state)
-        response = RedirectResponse(redirect_url)
+        response = RedirectResponse(redirect_url, status_code=status.HTTP_302_FOUND)
     else:
-        response = JSONResponse({"access_token": access_token, "refresh_token": refresh_token})
+        response = JSONResponse(
+            content={
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_type": "Bearer",
+            },
+        )
 
-    response.set_cookie("access_token", access_token, httponly=True, secure=False, samesite="Lax")
-    response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False, samesite="Lax")
+    # Configurer les cookies d'authentification
+    _set_auth_cookies(response, access_token, refresh_token or "")
 
     return response
 
 
-class RefreshRequest(BaseModel):
-    refresh_token: str | None = None
-
-
-@router.post("/refresh")
+@router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
-        body: RefreshRequest,
-        cookie_refresh: str | None = Cookie(default=None, alias="refresh_token"),
-        security: SecurityService = Depends(get_security_service),
-):
-    """Refresh manuel de l'access_token (via body JSON ou cookie)."""
-    refresh_token = body.refresh_token or cookie_refresh
-    if not refresh_token:
-        raise HTTPException(401, "No refresh token provided")
+    security: SecurityDep,
+    body: RefreshTokenRequest,
+    cookie_refresh: Annotated[str | None, Cookie(alias="refresh_token")] = None,
+) -> JSONResponse:
+    """Rafraîchit l'access token.
 
-    tokens = await security.refresh(refresh_token)
+    Le refresh token peut être fourni soit dans le body, soit dans un cookie.
 
-    response = JSONResponse(tokens)
-    response.set_cookie("access_token", tokens["access_token"], httponly=True, secure=False, samesite="Lax")
-    response.set_cookie("refresh_token", tokens["refresh_token"], httponly=True, secure=False, samesite="Lax")
+    Args:
+        security: Service de gestion de l'auth
+        body: Corps de la requête contenant optionnellement le refresh_token
+        cookie_refresh: Refresh token depuis les cookies
+
+    Returns:
+        Nouveaux tokens
+
+    Raises:
+        HTTPException: Si aucun refresh token n'est fourni
+
+    """
+    refresh = body.refresh_token or cookie_refresh
+    if not refresh:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No refresh token provided",
+        )
+
+    # Rafraîchir les tokens
+    tokens = await security.refresh_token(refresh)
+
+    # Préparer la réponse
+    response = JSONResponse(
+        content={
+            "access_token": tokens.access_token,
+            "refresh_token": tokens.refresh_token,
+            "token_type": tokens.token_type,
+        },
+    )
+
+    # Mettre à jour les cookies
+    _set_auth_cookies(
+        response,
+        tokens.access_token,
+        tokens.refresh_token or refresh,
+    )
+
     return response
 
 
-@router.get("/logout", dependencies=[Security(oauth2_scheme)])
+@router.post("/logout")
 async def logout(
-        id_token_hint: str,
-        security: SecurityService = Depends(get_security_service),
-        _: UserContext = Depends(require_user),
-):
-    """Logout côté Keycloak"""
-    logout_url = (
-        f"{security.logout_endpoint}"
-        f"?post_logout_redirect_uri={settings.APP_URL}/"
-        f"&id_token_hint={id_token_hint}"
-    )
-    return RedirectResponse(logout_url)
+    security: SecurityDep,
+    _: CurrentUser,
+    id_token_hint: Annotated[str | None, Query()] = None,
+) -> RedirectResponse:
+    """Déconnecte l'utilisateur de Keycloak.
 
-@router.get("/me", dependencies=[Security(oauth2_scheme)])
-async def me(
-        user: UserContext = Depends(require_user),
-        user_service: UserService = Depends(UserService)
-):
-    db_user = await user_service.get_user_from_subject(user.subject)
-    # TODO un DTO avec les infos (tenant, full_name,  email, status, username)
+    Args:
+        _: Contexte de l'utilisateur
+        security: Service de gestion de l'auth
+        id_token_hint: Token ID pour améliorer la déconnexion (optionnel)
 
-    return {
-        "subject": user.subject,
-        "email": user.email,
-        "roles": user.roles,
-        "claims": user.claims,
-        "db": db_user
+    Returns:
+        Redirection vers la page de déconnexion Keycloak
+
+    """
+    # Construire l'URL de logout
+    params = {
+        "post_logout_redirect_uri": f"{settings.app_url}/",
     }
+
+    if id_token_hint:
+        params["id_token_hint"] = id_token_hint
+
+    query_string = urllib.parse.urlencode(params)
+    logout_url = f"{security.logout_endpoint}?{query_string}"
+
+    # Créer la réponse de redirection
+    response = RedirectResponse(logout_url)
+
+    # Supprimer les cookies
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+
+    return response
+
+
+@router.get("/me", response_model=MeResponse)
+async def get_current_user(
+    user: CurrentUser,
+    user_service: UserServiceDep,
+) -> MeResponse:
+    """Retourne les informations de l'utilisateur connecté.
+
+    Combine les données JWT et les données de la base de données.
+
+    Returns:
+        Informations complètes de l'utilisateur
+
+    """
+    # Récupérer l'utilisateur depuis la DB
+    db_user = await user_service.get_user_from_subject(user.subject)
+
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found in database",
+        )
+
+    # Construire la réponse
+    return MeResponse(
+        subject=user.subject,
+        username=user.username,
+        email=user.email,
+        full_name=user.full_name,
+        roles=user.roles,
+        tenant_id=db_user.tenant_id if hasattr(db_user, "tenant_id") else None,
+        status=db_user.status if hasattr(db_user, "status") else "active",
+        created_at=db_user.created_at if hasattr(db_user, "created_at") else None,
+    )
+
+
+# ==============================================================================
+# Helper Functions
+# ==============================================================================
+
+
+def _set_auth_cookies(
+    response: RedirectResponse | JSONResponse,
+    access_token: str,
+    refresh_token: str,
+) -> None:
+    """Configure les cookies d'authentification.
+
+    Args:
+        response: La réponse HTTP
+        access_token: Le token d'accès
+        refresh_token: Le token de rafraîchissement
+
+    """
+    cookie_config = {
+        "httponly": True,
+        "secure": settings.environment == "production",
+        "samesite": "lax",
+        "max_age": 3600,  # 1 heure pour l'access token
+    }
+
+    response.set_cookie("access_token", access_token, **cookie_config)
+    response.set_cookie(
+        "refresh_token",
+        refresh_token,
+        **{**cookie_config, "max_age": 2592000},  # 30 jours pour le refresh token
+    )
