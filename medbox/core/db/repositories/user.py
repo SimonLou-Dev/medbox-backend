@@ -1,5 +1,6 @@
 """Repository pour les utilisateurs."""
 
+from fastapi import HTTPException
 from sqlalchemy import select
 
 from medbox.core.db.models.user import User
@@ -32,3 +33,35 @@ class UserRepository(BaseRepository[User]):
             stmt = select(self.model).where(self.model.keycloak_subject == subject_id)
             result = await session.execute(stmt)
             return result.scalar_one_or_none()
+
+    async def get_by_subject_or_fail(self, subject_id: str) -> User | None:
+        """Récupère un enregistrement via son identifiant.
+
+        Parameters
+        ----------
+        subject_id : str
+            Identifiant du sujet keycloak.
+
+        Returns
+        -------
+        ModelType
+            L'objet
+
+        Raise
+        ------
+        HTTPException
+            Utilisateur non trouvé
+
+
+        """
+        async with async_session_local() as session:
+            stmt = select(self.model).where(self.model.keycloak_subject == subject_id)
+            result = await session.execute(stmt)
+            usr = result.scalar_one_or_none()
+
+            if not usr:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Impossible de trouver l'utilisateur",
+                )
+            return usr

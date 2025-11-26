@@ -3,16 +3,16 @@
 import urllib.parse
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from medbox.api.dto.auth import MeResponse, RefreshTokenRequest, TokenResponse
 from medbox.core.config.settings import settings
+from medbox.core.dto.auth import MeResponse, RefreshTokenRequest, TokenResponse
 from medbox.core.services.security import (
     CurrentUser,
     SecurityDep,
 )
-from medbox.core.services.user import UserService
+from medbox.core.services.user import UserService, get_user_service
 
 router = APIRouter(prefix="/oauth2", tags=["OAuth2"])
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/oauth2", tags=["OAuth2"])
 # Type Aliases
 # ==============================================================================
 
-UserServiceDep = Annotated[UserService, Depends(UserService)]
+UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 
 # ==============================================================================
 # Routes
@@ -68,7 +68,7 @@ async def callback(
     security: SecurityDep,
     user_service: UserServiceDep,
     state: Annotated[str | None, Query()] = None,
-) -> Response:
+) -> JSONResponse:
     """Retour OAuth2 après authentification Keycloak.
 
     Échange le code d'autorisation contre des tokens et enregistre l'utilisateur.
@@ -87,7 +87,7 @@ async def callback(
     ctx, access_token, refresh_token = await security.exchange_code(code)
 
     # Enregistrement/mise à jour de l'utilisateur en DB
-    await user_service.register_user(ctx)
+    await user_service.sync_user_from_identity_provider(ctx)
 
     # Préparer la réponse (redirect ou JSON)
     if state:

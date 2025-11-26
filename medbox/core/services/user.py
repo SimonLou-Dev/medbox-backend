@@ -1,3 +1,5 @@
+"""Service de gestion des utilisateurs."""
+
 from fastapi import HTTPException
 
 from medbox.core.db.models import User
@@ -63,9 +65,14 @@ class UserService:
 
         """
         return await self.user_repo.update_or_create(
-            filters={"keycloak_subject", user_context.subject},
+            filters={"keycloak_subject": user_context.subject},
             defaults={
                 "email": user_context.email,
                 "c_full_name": user_context.full_name,
             },
         )
+
+
+def get_user_service() -> UserService:
+    """Getter du service."""
+    return UserService()

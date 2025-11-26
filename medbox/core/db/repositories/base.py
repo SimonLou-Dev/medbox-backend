@@ -1,20 +1,20 @@
 """Repository générique."""
 
-from collections.abc import Mapping, Sequence
-from typing import Any, TypeVar
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, Generic, TypeVar
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import DeclarativeMeta
+from sqlalchemy.orm import DeclarativeMeta, selectinload
 
 from medbox.core.db.session import async_session_local
 
 ModelType = TypeVar("ModelType", bound=DeclarativeMeta)
 
 
-class BaseRepository:
+class BaseRepository(Generic[ModelType]):
     """Repository générique fournissant les opérations CRUD usuelles."""
 
     def __init__(self, model: type[ModelType]) -> None:
@@ -32,13 +32,19 @@ class BaseRepository:
     # CRUD
     # -------------------------------------------------------------------------
 
-    async def get(self, m_id: UUID) -> ModelType | None:
+    async def get(
+        self,
+        m_id: UUID,
+        relations: Iterable[str] | None = None,
+    ) -> ModelType | None:
         """Récupère un enregistrement via son identifiant.
 
         Parameters
         ----------
         m_id : Any
             Identifiant primaire (UUID ou int selon ton modèle).
+        relations : Iterable[str], optional
+            Liste des relations à charger.
 
         Returns
         -------
@@ -48,11 +54,17 @@ class BaseRepository:
         """
         async with async_session_local() as session:
             stmt = select(self.model).where(self.model.id == m_id)
+            stmt = self._apply_relations(stmt, relations)
             result = await session.execute(stmt)
             return result.scalar_one_or_none()
 
-    async def list(self) -> Sequence[ModelType]:
+    async def list(self, relations: Iterable[str] | None = None) -> Sequence[ModelType]:
         """Renvoie l'ensemble des objets du modèle.
+
+        Parameters
+        ----------
+        relations : Iterable[str], optional
+            Liste des relations à charger.
 
         Returns
         -------
@@ -62,6 +74,7 @@ class BaseRepository:
         """
         async with async_session_local() as session:
             stmt = select(self.model)
+            stmt = self._apply_relations(stmt, relations)
             res = await session.execute(stmt)
             return res.scalars().all()
 
@@ -117,12 +130,38 @@ class BaseRepository:
             await session.commit()
             return True
 
-    async def exists(self, **filters: object) -> bool:
+    async def where(
+        self,
+        filters: Mapping[str, Any],
+        relations: Iterable[str] | None = None,
+    ) -> Sequence[ModelType]:
+        """Retournes tous les objets selon des filtres.
+
+        Parameters
+        ----------
+        filters :
+            Colonnes SQLAlchemy en equality match.
+        relations : Iterable[str], optional
+            Liste des relations à charger.
+
+        Returns
+        -------
+        Sequence[ModelType]
+            Liste des correspondances
+
+        """
+        async with async_session_local() as session:
+            stmt = select(self.model).filter_by(**filters)
+            stmt = self._apply_relations(stmt, relations)
+            res = await session.execute(stmt)
+            return res.scalars().all()
+
+    async def exists(self, filters: Mapping[str, Any]) -> bool:
         """Vérifie l'existence d'un objet selon des filtres.
 
         Parameters
         ----------
-        **filters :
+        filters :
             Colonnes SQLAlchemy en equality match.
 
         Returns
@@ -136,6 +175,53 @@ class BaseRepository:
             res = await session.execute(stmt)
             return res.scalar_one_or_none() is not None
 
+    async def update(
+        self,
+        m_id: UUID,
+        values: Mapping[str, Any],
+    ) -> ModelType:
+        """Met à jour un objet existant via son identifiant.
+
+        Parameters
+        ----------
+        m_id : UUID
+            Identifiant primaire de l'objet à mettre à jour.
+        values : Mapping[str, Any]
+            Clés/valeurs à modifier sur l'objet.
+
+        Returns
+        -------
+        ModelType
+            L'objet mis à jour.
+
+        Raises
+        ------
+        HTTPException :
+            Si l'objet n'existe pas.
+
+        """
+        async with async_session_local() as session:
+            # Chargement
+            stmt = select(self.model).where(self.model.id == m_id)
+            res = await session.execute(stmt)
+            instance = res.scalar_one_or_none()
+
+            if instance is None:
+                raise HTTPException(404, f"{self.model.__name__} not found")
+
+            # Apply updates
+            for field, value in values.items():
+                setattr(instance, field, value)
+
+            try:
+                await session.commit()
+            except IntegrityError as exc:
+                await session.rollback()
+                raise HTTPException(400, "Integrity error during update") from exc
+
+            await session.refresh(instance)
+            return instance
+
     # -------------------------------------------------------------------------
     # Méthodes avancées
     # -------------------------------------------------------------------------
@@ -144,7 +230,7 @@ class BaseRepository:
         self,
         *,
         defaults: Mapping[str, Any] | None = None,
-        **filters: object,
+        filters: Mapping[str, Any],
     ) -> ModelType:
         """Récupère un objet correspondant aux filtres. Le crée s'il n'existe pas.
 
@@ -152,7 +238,7 @@ class BaseRepository:
         ----------
         defaults : Optional[Mapping[str, Any]]
             Valeurs supplémentaires utilisées lors de la création.
-        **filters :
+        filters :
             Conditions de recherche (WHERE).
 
         Returns
@@ -192,7 +278,7 @@ class BaseRepository:
         self,
         *,
         defaults: Mapping[str, Any],
-        **filters: object,
+        filters: Mapping[str, Any],
     ) -> ModelType:
         """Met à jour un objet existant ou le crée s'il n'existe pas.
 
@@ -200,7 +286,7 @@ class BaseRepository:
         ----------
         defaults : Mapping[str, Any]
             Champs à mettre à jour ou à utiliser lors de la création.
-        **filters :
+        filters :
             Critères identifiant l'objet.
 
         Returns
@@ -237,6 +323,7 @@ class BaseRepository:
         *,
         page: int = 1,
         per_page: int = 20,
+        relations: Iterable[str] | None = None,
     ) -> Sequence[ModelType]:
         """Renvoie une page d'objets.
 
@@ -246,6 +333,8 @@ class BaseRepository:
             Numéro de page (>= 1).
         per_page : int
             Nombre d'éléments par page.
+        relations : Iterable[str], optional
+            Liste des relations à charger.
 
         Returns
         -------
@@ -257,6 +346,7 @@ class BaseRepository:
 
         async with async_session_local() as session:
             stmt = select(self.model).offset(offset).limit(per_page)
+            stmt = self._apply_relations(stmt, relations)
             res = await session.execute(stmt)
             return res.scalars().all()
 
@@ -267,6 +357,7 @@ class BaseRepository:
         query: str,
         page: int = 1,
         per_page: int = 20,
+        relations: Iterable[str] | None = None,
     ) -> Sequence[ModelType]:
         """Recherche textuelle simple sur un champ du modèle.
 
@@ -280,6 +371,8 @@ class BaseRepository:
             Page de résultats.
         per_page : int
             Nombre par page.
+        relations : Iterable[str], optional
+            Liste des relations à charger.
 
         Returns
         -------
@@ -306,5 +399,30 @@ class BaseRepository:
                 .offset(offset)
                 .limit(per_page)
             )
+            stmt = self._apply_relations(stmt, relations)
             res = await session.execute(stmt)
             return res.scalars().all()
+
+    # -------------------------------------------------------------------------
+    # Loading des relations
+    # -------------------------------------------------------------------------
+
+    def _apply_relations(self, stmt: Select, relations: Iterable[str] | None) -> Select:
+        if not relations:
+            return stmt
+
+        for path in relations:
+            parts = path.split(".")
+            attr = getattr(self.model, parts[0], None)
+            if attr is None:
+                msg = f"{self.model.__name__} has no relation '{parts[0]}'"
+                raise AttributeError(msg)
+
+            load_opt = selectinload(attr)
+
+            for sub in parts[1:]:
+                load_opt = load_opt.selectinload(sub)
+
+            stmt = stmt.options(load_opt)
+
+        return stmt
