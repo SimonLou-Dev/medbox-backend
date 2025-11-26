@@ -3,24 +3,14 @@
 import urllib.parse
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Cookie, HTTPException, Query, Security, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from medbox.core.config.settings import settings
 from medbox.core.dto.auth import MeResponse, RefreshTokenRequest, TokenResponse
-from medbox.core.services.security import (
-    CurrentUser,
-    SecurityDep,
-)
-from medbox.core.services.user import UserService, get_user_service
+from medbox.core.services import CurrentUser, SecuritySvcDep, UserSvcDep, oauth2_scheme
 
 router = APIRouter(prefix="/oauth2", tags=["OAuth2"])
-
-# ==============================================================================
-# Type Aliases
-# ==============================================================================
-
-UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 
 # ==============================================================================
 # Routes
@@ -29,7 +19,7 @@ UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 
 @router.get("/login")
 async def login(
-    security: SecurityDep,
+    security: SecuritySvcDep,
     redirect_uri: Annotated[str | None, Query()] = None,
 ) -> RedirectResponse:
     """Redirige vers la page de connexion Keycloak.
@@ -65,8 +55,8 @@ async def login(
 @router.get("/callback")
 async def callback(
     code: Annotated[str, Query()],
-    security: SecurityDep,
-    user_service: UserServiceDep,
+    security: SecuritySvcDep,
+    user_service: UserSvcDep,
     state: Annotated[str | None, Query()] = None,
 ) -> JSONResponse:
     """Retour OAuth2 après authentification Keycloak.
@@ -108,9 +98,13 @@ async def callback(
     return response
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    dependencies=[Security(oauth2_scheme)],
+)
 async def refresh_token(
-    security: SecurityDep,
+    security: SecuritySvcDep,
     body: RefreshTokenRequest,
     cookie_refresh: Annotated[str | None, Cookie(alias="refresh_token")] = None,
 ) -> JSONResponse:
@@ -159,9 +153,9 @@ async def refresh_token(
     return response
 
 
-@router.post("/logout")
+@router.post("/logout", dependencies=[Security(oauth2_scheme)])
 async def logout(
-    security: SecurityDep,
+    security: SecuritySvcDep,
     _: CurrentUser,
     id_token_hint: Annotated[str | None, Query()] = None,
 ) -> RedirectResponse:
@@ -197,10 +191,10 @@ async def logout(
     return response
 
 
-@router.get("/me", response_model=MeResponse)
+@router.get("/me", response_model=MeResponse, dependencies=[Security(oauth2_scheme)])
 async def get_current_user(
     user: CurrentUser,
-    user_service: UserServiceDep,
+    user_service: UserSvcDep,
 ) -> MeResponse:
     """Retourne les informations de l'utilisateur connecté.
 
@@ -225,7 +219,8 @@ async def get_current_user(
         username=user.username,
         email=user.email,
         full_name=user.full_name,
-        roles=user.roles,
+        realm_roles=user.roles,
+        role=db_user.role,
         tenant_id=db_user.tenant_id if hasattr(db_user, "tenant_id") else None,
         status=db_user.status if hasattr(db_user, "status") else "active",
         created_at=db_user.created_at if hasattr(db_user, "created_at") else None,

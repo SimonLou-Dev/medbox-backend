@@ -1,6 +1,7 @@
 """DTOs pour l'authentification et la gestion des utilisateurs."""
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -38,8 +39,12 @@ class MeResponse(BaseModel):
     username: str = Field(..., description="Nom d'utilisateur")
     email: EmailStr | None = Field(None, description="Adresse email")
     full_name: str = Field(..., description="Nom complet")
-    roles: list[str] = Field(default_factory=list, description="Rôles de l'utilisateur")
-    tenant_id: int | None = Field(None, description="ID du tenant")
+    realm_roles: list[str] = Field(
+        default_factory=list,
+        description="Rôles de l'utilisateur depuis keycloak",
+    )
+    role: str = Field(None, description="Rôles de l'utilisateur")
+    tenant_id: UUID | None = Field(None, description="ID du tenant")
     status: str = Field(default="active", description="Statut du compte")
     created_at: datetime | None = Field(None, description="Date de création")
 

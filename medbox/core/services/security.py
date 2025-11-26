@@ -465,12 +465,3 @@ def require_roles(*expected_roles: str) -> UserContext:
         return user
 
     return dependency
-
-
-# ==============================================================================
-# Type Aliases (pour simplifier l'usage)
-# ==============================================================================
-
-SecurityDep = Annotated[SecurityService, Depends(get_security_service)]
-CurrentUser = Annotated[UserContext, Depends(require_user)]
-OptionalUser = Annotated[UserContext | None, Depends(optional_user)]

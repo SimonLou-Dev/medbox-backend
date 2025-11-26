@@ -1,16 +1,14 @@
 # medbox/api/middlewares/auth_middleware.py
 
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response as StarletteResponse
-from typing import Optional
 
 from medbox.core.services.security import SecurityService
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware global :
+    """Middleware global :
     - Extrait l'utilisateur courant via SecurityService
     - Silent refresh si nécessaire
     - Attache request.state.user (UserContext ou None)
@@ -34,7 +32,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Étape 2 — Essayer de décoder / refresh
         try:
             user_ctx = await self.security_service.get_current_user(
-                request, response
+                request,
+                response,
             )
             request.state.user = user_ctx  # UserContext
         except Exception:

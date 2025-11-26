@@ -5,6 +5,7 @@
 # ==============================================================================
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +13,7 @@ from pydantic import BaseModel, Field
 class TenantResponse(BaseModel):
     """Réponse pour un tenant."""
 
+    id: UUID = Field(None, description="Identifiant du tenant")
     name: str = Field(..., description="Nom du tenant")
     patient_count: int = Field(None, description="Nombre de patient")
     caregiver_count: int = Field(None, description="Nombre de soignant")

@@ -69,6 +69,7 @@ class TenantRepository(BaseRepository[Tenant]):
             tenant, patient_count, box_count, wheel_count, caregiver_count = row
 
             return TenantResponse(
+                id=tenant.id,
                 name=tenant.name,
                 patient_count=patient_count,
                 caregiver_count=caregiver_count,
