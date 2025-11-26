@@ -1,19 +1,26 @@
+"""Définition du modèle  d'un PrescriptionItem."""
+
 from __future__ import annotations
 
-import uuid
+import uuid  # noqa: TCH003
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, ForeignKey, Integer
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
-from ._mixins import IDMixin, TimestampMixin
+from medbox.core.db.models._mixins import IDMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from medbox.core.db.models.global_medication import GlobalMedication
+    from medbox.core.db.models.prescription import Prescription
+    from medbox.core.db.models.wheel_slot_prescription_item import (
+        WheelSlotPrescriptionItem,
+    )
 
 
 class PrescriptionItem(Base, IDMixin, TimestampMixin):
-    """
-    Un médicament dans une ordonnance, avec sa posologie.
-    Exemple : Metformine 500mg, 1 cp matin et soir.
-    """
+    """Un médicament dans une ordonnance, avec sa posologie."""
 
     __tablename__ = "prescription_items"
 
@@ -51,8 +58,8 @@ class PrescriptionItem(Base, IDMixin, TimestampMixin):
         nullable=True,
     )
 
-    prescription: Mapped["Prescription"] = relationship(back_populates="items")
-    medication: Mapped["GlobalMedication | None"] = relationship()
-    wheel_slot_links: Mapped[list["WheelSlotPrescriptionItem"]] = relationship(
-        back_populates="prescription_item"
+    prescription: Mapped[Prescription] = relationship(back_populates="items")
+    medication: Mapped[GlobalMedication | None] = relationship()
+    wheel_slot_links: Mapped[list[WheelSlotPrescriptionItem]] = relationship(
+        back_populates="prescription_item",
     )

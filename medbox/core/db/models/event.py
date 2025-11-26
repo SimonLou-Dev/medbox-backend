@@ -1,20 +1,25 @@
+"""Définitions du modèles Événements."""
+
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
+import uuid  # noqa: TCH003
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, DateTime, ForeignKey, JSON
+from sqlalchemy import JSON, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
-from ._mixins import IDMixin, TimestampMixin
+from medbox.core.db.models._mixins import IDMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from medbox.core.db.models.box import Box
+    from medbox.core.db.models.patient import Patient
+    from medbox.core.db.models.tenant import Tenant
+    from medbox.core.db.models.wheel import Wheel
 
 
 class Event(Base, IDMixin, TimestampMixin):
-    """
-    Événements liés aux boxes / wheels / patients.
-    Ex: distribution OK, échec, chute détectée, ouverture non prévue, etc.
-    """
+    """Événements liés aux boxes / wheels / patients."""
 
     __tablename__ = "events"
 
@@ -48,7 +53,7 @@ class Event(Base, IDMixin, TimestampMixin):
         doc="Détails spécifiques (slot index, code erreur, etc.)",
     )
 
-    tenant: Mapped["Tenant"] = relationship(back_populates="events")
-    box: Mapped["Box | None"] = relationship(back_populates="events")
-    wheel: Mapped["Wheel | None"] = relationship(back_populates="events")
-    patient: Mapped["Patient | None"] = relationship(back_populates="events")
+    tenant: Mapped[Tenant] = relationship(back_populates="events")
+    box: Mapped[Box | None] = relationship(back_populates="events")
+    wheel: Mapped[Wheel | None] = relationship(back_populates="events")
+    patient: Mapped[Patient | None] = relationship(back_populates="events")

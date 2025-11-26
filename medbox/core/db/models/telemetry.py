@@ -1,20 +1,23 @@
+"""Définition du modèle  de télémetrie."""
+
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
+import uuid  # noqa: TCH003
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, DateTime, ForeignKey, Float, JSON
+from sqlalchemy import JSON, Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
-from ._mixins import IDMixin, TimestampMixin
+from medbox.core.db.models._mixins import IDMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from medbox.core.db.models.box import Box
+    from medbox.core.db.models.tenant import Tenant
 
 
 class Telemetry(Base, IDMixin, TimestampMixin):
-    """
-    Télémétrie technique de la box : batterie, RSSI, température, erreurs, etc.
-    L'agrégation pour Grafana se fera ailleurs.
-    """
+    """Télémétrie technique de la box."""
 
     __tablename__ = "telemetry"
 
@@ -37,6 +40,5 @@ class Telemetry(Base, IDMixin, TimestampMixin):
     value_number: Mapped[float | None] = mapped_column(Float, nullable=True)
     value_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
-
-    tenant: Mapped["Tenant"] = relationship(back_populates="telemetry")
-    box: Mapped["Box | None"] = relationship(back_populates="telemetry")
+    tenant: Mapped[Tenant] = relationship(back_populates="telemetry")
+    box: Mapped[Box | None] = relationship(back_populates="telemetry")

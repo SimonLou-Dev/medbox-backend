@@ -1,21 +1,27 @@
+"""Définition du modèle  d'une Prescription."""
+
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
+import uuid  # noqa: TCH003
+from datetime import datetime  # noqa: TCH003
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, DateTime, ForeignKey
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
-from ._mixins import IDMixin, TimestampMixin
-from ..types import EncryptedString
+from medbox.core.db.models._mixins import IDMixin, TimestampMixin
+from medbox.core.db.types import EncryptedString
+
+if TYPE_CHECKING:
+    from medbox.core.db.models.patient import Patient
+    from medbox.core.db.models.prescription_item import PrescriptionItem
+    from medbox.core.db.models.tenant import Tenant
+    from medbox.core.db.models.user import User
 
 
 class Prescription(Base, IDMixin, TimestampMixin):
-    """
-    Une ordonnance complète pour un patient.
-    Exemple : ordonnance diabétologue, ordonnance généraliste, etc.
-    """
+    """Une ordonnance complète pour un patient."""
 
     __tablename__ = "prescriptions"
 
@@ -46,13 +52,12 @@ class Prescription(Base, IDMixin, TimestampMixin):
     start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-
-    tenant: Mapped["Tenant"] = relationship(back_populates="prescriptions")
-    patient: Mapped["Patient"] = relationship(back_populates="prescriptions")
-    created_by: Mapped["User | None"] = relationship(
-        back_populates="created_prescriptions"
+    tenant: Mapped[Tenant] = relationship(back_populates="prescriptions")
+    patient: Mapped[Patient] = relationship(back_populates="prescriptions")
+    created_by: Mapped[User | None] = relationship(
+        back_populates="created_prescriptions",
     )
-    items: Mapped[list["PrescriptionItem"]] = relationship(
+    items: Mapped[list[PrescriptionItem]] = relationship(
         back_populates="prescription",
         cascade="all, delete-orphan",
     )

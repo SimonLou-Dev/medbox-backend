@@ -1,8 +1,12 @@
+"""Configuration de l'applciation."""
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Représentation de la configuration de l'applciation."""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -17,16 +21,18 @@ class Settings(BaseSettings):
     database_password: str = Field(alias="DATABASE_PASSWORD")
     database_name: str = Field(alias="DATABASE_NAME")
 
-    def get_async_db_url(self):
-        return f"postgresql+asyncpg://{str(self.database_user)}:{str(self.database_password)}@{self.database_host}:{self.database_port}/{self.database_name}"
+    def get_async_db_url(self) -> str:
+        """Obtenir l'url postgres async."""
+        return f"postgresql+asyncpg://{self.database_user!s}:{self.database_password!s}@{self.database_host}:{self.database_port}/{self.database_name}"
 
-    def get_sync_db_url(self):
-        return f"postgresql+psycopg2://{str(self.database_user)}:{str(self.database_password)}@{self.database_host}:{self.database_port}/{self.database_name}"
+    def get_sync_db_url(self) -> str:
+        """Obtenir l'url postgres sync."""
+        return f"postgresql+psycopg2://{self.database_user!s}:{self.database_password!s}@{self.database_host}:{self.database_port}/{self.database_name}"
 
     # --- Redis (for task queue, cache…) ---
     redis_url: str = Field(
         default="redis://redis:6379/0",
-        alias="REDIS_URL"
+        alias="REDIS_URL",
     )
 
     # --- Keycloak / Auth ---
@@ -45,7 +51,7 @@ class Settings(BaseSettings):
     # --- Security ---
     encryption_key: str = Field(
         default="changeme-super-secret-key-32bytes",  # doit faire 32 bytes
-        alias="ENCRYPTION_KEY"
+        alias="ENCRYPTION_KEY",
     )
 
     app_url: str = Field(alias="APP_URL", default="http://localhost:8000")
@@ -53,5 +59,6 @@ class Settings(BaseSettings):
 
     # --- Misc ---
     environment: str = "development"
+
 
 settings = Settings()

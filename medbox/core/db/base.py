@@ -1,9 +1,7 @@
-from datetime import datetime
-import uuid
+"""Déclaration Metadata."""
 
-from sqlalchemy import DateTime
-from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase
 
 
 class Base(DeclarativeBase):
-    pass
+    """Source utilisé par les models."""

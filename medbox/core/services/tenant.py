@@ -1,5 +1,6 @@
 """Service de gestion des tenant."""
 
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from medbox.core.constants.enums import UserRoles, UserStatus
@@ -9,6 +10,10 @@ from medbox.core.db.repositories.tenant import TenantRepository
 from medbox.core.db.repositories.user import UserRepository
 from medbox.core.dto.tenant import TenantRequest, TenantResponse
 from medbox.core.services.security import UserContext
+
+if TYPE_CHECKING:
+    from medbox.core.services.tenant_invitation import TenantInvitationService
+    from medbox.core.services.tenant_right import TenantRightService
 
 
 class TenantService:

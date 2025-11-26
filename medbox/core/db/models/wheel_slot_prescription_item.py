@@ -1,19 +1,23 @@
+"""Définition du modèle prescription - case roue."""
+
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
-from ._mixins import IDMixin, TimestampMixin
+from medbox.core.db.models._mixins import IDMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from medbox.core.db.models.prescription_item import PrescriptionItem
+    from medbox.core.db.models.wheel_slot import WheelSlot
 
 
 class WheelSlotPrescriptionItem(Base, IDMixin, TimestampMixin):
-    """
-    Lien entre un compartiment de roue et un item d'ordonnance.
-    Permet de dire : dans ce slot, il y a tel médicament de telle prescription.
-    """
+    """Lien entre un compartiment de roue et un item d'ordonnance."""
 
     __tablename__ = "wheel_slot_prescription_items"
 
@@ -39,7 +43,7 @@ class WheelSlotPrescriptionItem(Base, IDMixin, TimestampMixin):
         doc="Nombre de pilules / unités dans le slot pour cet item",
     )
 
-    wheel_slot: Mapped["WheelSlot"] = relationship(back_populates="prescription_links")
-    prescription_item: Mapped["PrescriptionItem"] = relationship(
-        back_populates="wheel_slot_links"
+    wheel_slot: Mapped[WheelSlot] = relationship(back_populates="prescription_links")
+    prescription_item: Mapped[PrescriptionItem] = relationship(
+        back_populates="wheel_slot_links",
     )

@@ -8,17 +8,15 @@ from medbox.core.services.security import SecurityService
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    """Middleware global :
-    - Extrait l'utilisateur courant via SecurityService
-    - Silent refresh si nécessaire
-    - Attache request.state.user (UserContext ou None)
-    """
+    """Middleware de gestion de l'auth."""
 
-    def __init__(self, app, security_service: SecurityService):
+    def __init__(self, app, security_service: SecurityService) -> None:
+        """Constructeur."""
         super().__init__(app)
         self.security_service = security_service
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        """Fonction de vérification."""
         response = Response("Internal server error", status_code=500)
 
         # Étape 1 — Extraire le token
@@ -40,5 +38,4 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.user = None
 
         # Étape 3 — Continue
-        response = await call_next(request)
-        return response
+        return await call_next(request)

@@ -1,22 +1,26 @@
+"""Définition du modèle  d'une Invitation."""
+
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, DateTime, Enum as SAEnum
+from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from medbox.core.constants.enums import InviteStatus
 from medbox.core.db.base import Base
-from ._mixins import IDMixin, TimestampMixin
-from ..types import EncryptedString
-from ...constants.enums import InviteStatus
+from medbox.core.db.models._mixins import IDMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from medbox.core.db.models.tenant import Tenant
+    from medbox.core.db.models.user import User
 
 
 class Invitation(Base, IDMixin, TimestampMixin):
-    """
-    Utilisateur logique Medbox (lié à Keycloak via subject_id).
-    Pas de mot de passe ici, tout est externalisé.
-    """
+    """Invitation d'un  utilisateur dans un tenant."""
 
-    __tablename__ = 'invitations'
+    __tablename__ = "invitations"
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"),

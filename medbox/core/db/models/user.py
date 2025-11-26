@@ -1,6 +1,7 @@
 """Modèle d'un utilsiateur."""
 
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import ForeignKey, String
@@ -10,6 +11,10 @@ from medbox.core.constants.enums import UserRoles, UserStatus
 from medbox.core.db.base import Base
 from medbox.core.db.models._mixins import IDMixin, TimestampMixin
 from medbox.core.db.types import EncryptedString
+
+if TYPE_CHECKING:
+    from medbox.core.db.models.prescription import Prescription
+    from medbox.core.db.models.tenant import Tenant
 
 
 class User(Base, IDMixin, TimestampMixin):

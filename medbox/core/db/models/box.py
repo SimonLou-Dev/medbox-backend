@@ -1,23 +1,29 @@
+"""Boîtier physique de distribution."""
+
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
+import uuid  # noqa: TCH003
+from datetime import datetime  # noqa: TCH003
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, DateTime, ForeignKey, Boolean, Integer
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
-from ._mixins import IDMixin, TimestampMixin
+from medbox.core.db.models._mixins import IDMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from medbox.core.db.models.event import Event
+    from medbox.core.db.models.patient import Patient
+    from medbox.core.db.models.telemetry import Telemetry
+    from medbox.core.db.models.tenant import Tenant
+    from medbox.core.db.models.wheel import Wheel
 
 
 class Box(Base, IDMixin, TimestampMixin):
-    """
-    Boîtier physique de distribution.
-    La logique métier reste côté API, la box exécute les ordres.
-    """
+    """Boîtier physique de distribution."""
 
     __tablename__ = "boxes"
-
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"),
@@ -47,16 +53,16 @@ class Box(Base, IDMixin, TimestampMixin):
     timezone: Mapped[str | None] = mapped_column(String(64))
 
     battery_level: Mapped[int | None] = mapped_column(
-        Integer, doc="Pourcentage 0-100", nullable=True
+        Integer,
+        doc="Pourcentage 0-100",
+        nullable=True,
     )
     on_battery: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-
-
-    tenant: Mapped["Tenant"] = relationship(back_populates="boxes")
-    patient: Mapped["Patient | None"] = relationship(back_populates="boxes")
-    wheels: Mapped[list["Wheel"]] = relationship(back_populates="box")
-    events: Mapped[list["Event"]] = relationship(back_populates="box")
-    telemetry: Mapped[list["Telemetry"]] = relationship(back_populates="box")
+    tenant: Mapped[Tenant] = relationship(back_populates="boxes")
+    patient: Mapped[Patient | None] = relationship(back_populates="boxes")
+    wheels: Mapped[list[Wheel]] = relationship(back_populates="box")
+    events: Mapped[list[Event]] = relationship(back_populates="box")
+    telemetry: Mapped[list[Telemetry]] = relationship(back_populates="box")

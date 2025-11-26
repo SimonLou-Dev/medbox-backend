@@ -1,8 +1,9 @@
-import uuid
-from sqlalchemy.orm import Mapped, mapped_column
+import uuid  # noqa: EXE002
 from datetime import datetime
-from sqlalchemy.orm import Mapped, mapped_column
+
 from sqlalchemy import DateTime
+from sqlalchemy.orm import Mapped, mapped_column
+
 
 class IDMixin:
     id: Mapped[uuid.UUID] = mapped_column(

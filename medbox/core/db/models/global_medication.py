@@ -1,23 +1,18 @@
+"""Référentiel global de médicaments."""
+
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
-
-from sqlalchemy import String, DateTime
+from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from medbox.core.db.base import Base
-from ._mixins import IDMixin, TimestampMixin
+from medbox.core.db.models._mixins import IDMixin, TimestampMixin
 
 
 class GlobalMedication(Base, IDMixin, TimestampMixin):
-    """
-    Référentiel global de médicaments.
-    Pas de notion de tenant ici.
-    """
+    """Référentiel global de médicaments."""
 
     __tablename__ = "global_medications"
-
 
     code: Mapped[str] = mapped_column(
         String(128),
@@ -30,5 +25,3 @@ class GlobalMedication(Base, IDMixin, TimestampMixin):
     form: Mapped[str | None] = mapped_column(String(128), nullable=True)
     brand: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(String(1024), nullable=True)
-
-
