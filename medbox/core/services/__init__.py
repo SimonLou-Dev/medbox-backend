@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from medbox.core.db.repositories.invitation import InvitationRepository
 from medbox.core.db.repositories.tenant import TenantRepository
 from medbox.core.db.repositories.user import UserRepository
 from medbox.core.services.security import (
@@ -46,7 +47,11 @@ def get_user_service() -> UserService:
 
 def get_tenant_invitation_service() -> TenantInvitationService:
     """Crée Factory pour le service d'invitation."""
-    return TenantInvitationService(UserRepository(), TenantRepository())
+    return TenantInvitationService(
+        UserRepository(),
+        TenantRepository(),
+        InvitationRepository(),
+    )
 
 
 def get_tenant_right_service() -> TenantRightService:

@@ -156,13 +156,19 @@ class BaseRepository(Generic[ModelType]):
             res = await session.execute(stmt)
             return res.scalars().all()
 
-    async def exists(self, filters: Mapping[str, Any]) -> bool:
+    async def exists(
+        self,
+        filters: Mapping[str, Any],
+        extra_filters: list[Any] | None = None,
+    ) -> bool:
         """Vérifie l'existence d'un objet selon des filtres.
 
         Parameters
         ----------
         filters :
             Colonnes SQLAlchemy en equality match.
+        extra_filters:
+            Colonnes SQLAlchemy en where
 
         Returns
         -------
@@ -172,6 +178,9 @@ class BaseRepository(Generic[ModelType]):
         """
         async with async_session_local() as session:
             stmt = select(self.model).filter_by(**filters).limit(1)
+            if extra_filters:
+                for cond in extra_filters:
+                    stmt = stmt.where(cond)
             res = await session.execute(stmt)
             return res.scalar_one_or_none() is not None
 
