@@ -1,17 +1,29 @@
 """Repository générique."""
 
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeMeta, selectinload
 
 from medbox.core.db.session import async_session_local
 
 ModelType = TypeVar("ModelType", bound=DeclarativeMeta)
+
+
+@dataclass
+class Page(Generic[ModelType]):
+    """Pagination."""
+
+    items: Sequence[ModelType]  # Contenu de la page
+    page: int  # Page courante
+    per_page: int  # Taille d’une page
+    total: int  # Nombre total d’éléments
+    total_pages: int  # Nombre total de pages
 
 
 class BaseRepository(Generic[ModelType]):
@@ -330,14 +342,17 @@ class BaseRepository(Generic[ModelType]):
     async def paginate(
         self,
         *,
+        filters: Mapping[str, Any],
         page: int = 1,
         per_page: int = 20,
         relations: Iterable[str] | None = None,
-    ) -> Sequence[ModelType]:
+    ) -> Page[ModelType]:
         """Renvoie une page d'objets.
 
         Parameters
         ----------
+        filters:
+            Filtrage
         page : int
             Numéro de page (>= 1).
         per_page : int
@@ -347,17 +362,54 @@ class BaseRepository(Generic[ModelType]):
 
         Returns
         -------
-        Sequence[ModelType]
-            Les objets de la page demandée.
+        Page[ModelType]
+            La page
 
         """
         offset = (page - 1) * per_page
 
         async with async_session_local() as session:
-            stmt = select(self.model).offset(offset).limit(per_page)
+            # Requête de base
+            stmt = select(self.model)
+
+            # Application des filtres simples (égalité)
+            if filters:
+                conditions = []
+                for field, value in filters.items():
+                    attr = getattr(self.model, field, None)
+                    if attr is None:
+                        raise ValueError(f"Champ inconnu dans le modèle: {field}")
+                    conditions.append(attr == value)
+                stmt = stmt.filter(*conditions)
+
+            # Charger les relations
             stmt = self._apply_relations(stmt, relations)
-            res = await session.execute(stmt)
-            return res.scalars().all()
+
+            # Exécuter la requête paginée
+            stmt_paginated = stmt.offset(offset).limit(per_page)
+            result = await session.execute(stmt_paginated)
+            items = result.scalars().all()
+
+            # Compter le total d’éléments correspondant aux filtres
+            count_stmt = select(func.count()).select_from(self.model)
+
+            if filters:
+                for field, value in filters.items():
+                    attr = getattr(self.model, field)
+                    count_stmt = count_stmt.filter(attr == value)
+
+            total = (await session.execute(count_stmt)).scalar_one()
+
+            # Calculer le nombre total de pages
+            total_pages = (total + per_page - 1) // per_page
+
+            return Page(
+                items=items,
+                page=page,
+                per_page=per_page,
+                total=total,
+                total_pages=total_pages,
+            )
 
     async def search(
         self,

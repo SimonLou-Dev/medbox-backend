@@ -45,3 +45,27 @@ class InvitationRepository(BaseRepository[Invitation]):
             )
             result = await session.execute(stmt)
             return result.scalar_one_or_none()
+
+    async def get_by_code(self, code: str) -> Invitation | None:
+        """Recherche une invitation via son code.
+
+        Parameters
+        ----------
+        code : str
+            Code à saisir par l'utilisateur
+
+        Returns
+        -------
+        Invitation
+            Invitation crée.
+
+        Raises
+        ------
+        HTTPException :
+            Si l'objet n'existe pas ou déja dans un tenant, ou déja  une invité"
+
+        """
+        async with async_session_local() as session:
+            stmt = select(self.model).where(self.model.code == code)
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()

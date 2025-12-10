@@ -98,6 +98,32 @@ class TenantRightService:
             },
         )
 
+    async def ensure_user_not_in_tenant(self, user_sub: str) -> bool:
+        """Vérifie que l'utilisateur n'est pas dans un tenant.
+
+        Parameters
+        ----------
+        user_sub : sub
+            Identifiant keycloak de l'utilisateur
+
+        Returns
+        -------
+        bool
+            True si le  user est bien dans le tenant.
+
+        Raises
+        ------
+        HTTPException :
+            Si l'objet n'existe pas.
+
+        """
+        return await self.user_repo.exists(
+            {
+                "keycloak_subject": user_sub,
+                "tenant_id": None,
+            },
+        )
+
     async def ensure_user_in_tenant_has_role(
         self,
         user_sub: str,

@@ -2,16 +2,13 @@ import dramatiq
 
 
 @dramatiq.actor(queue_name="tenant_invitation")
-async def expire_invitation(invite_id: str):
+async def expire_invitation(invite_id: str) -> None:
     """Marque une invitation comme expirée."""
-    from medbox.core.db.repositories.invitation import InvitationRepository
+    from medbox.core.services import (
+        TenantInvitationService,
+        get_tenant_invitation_service,
+    )
 
-    repo = InvitationRepository()
+    svc: TenantInvitationService = get_tenant_invitation_service()
 
-    # Charger l'invitation
-    invite = await repo.get(invite_id)
-    if not invite:
-        return
-
-    # Marquer comme expiré
-    await repo.update(invite_id, {"status": "EXPIRED"})
+    await svc.expire_invitation(invite_id)

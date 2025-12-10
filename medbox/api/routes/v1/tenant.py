@@ -116,9 +116,8 @@ async def update_tenant(
 )
 async def delete_tenant(
     tenant_id: UUID,
-    user: Annotated[UserContext, Depends(require_tenant_role(UserRoles.TENANT_ADMIN))],
+    _: Annotated[UserContext, Depends(require_tenant_role(UserRoles.TENANT_ADMIN))],
     tenant_svc: TenantSvcDep,
-    tenant_right_svc: TenantRightSvcDep,
 ) -> None:
     """Supprime un tenant.
 
@@ -128,12 +127,6 @@ async def delete_tenant(
         tenant_id: UUID du tenant
         user: Utilisateur authentifié avec rôle admin
         tenant_svc: Service des tenants
-        tenant_right_svc: Service des droits des tenants
 
     """
-    await tenant_right_svc.ensure_user_in_tenant_has_role_or_fail(
-        user.subject,
-        tenant_id,
-        UserRoles.TENANT_ADMIN,
-    )
     await tenant_svc.delete(tenant_id)
