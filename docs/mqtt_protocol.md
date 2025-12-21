@@ -35,7 +35,7 @@ medbox/                           ← Namespace racine
 │   ├── {BOX_UUID}/               ← Instance box spécifique
 │   │   ├── evt/                  ← Events: BOX → BACKEND
 │   │   └── cmd/                  ← Commands: BACKEND → BOX
-└── system/                       ← Topics système (optionnel)
+
 ```
 
 ### Wildcards MQTT
@@ -145,7 +145,6 @@ Les commandes sont publiées sur `medbox/box/{box_id}/cmd/{cmd_type}`.
   "cmd_id": "cmd_reset_001",
   "type": "wheel_reset",
   "timestamp": "2025-12-21T14:40:00Z",
-  "operator": "tech_42"
 }
 ```
 
