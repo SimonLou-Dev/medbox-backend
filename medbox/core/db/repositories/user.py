@@ -1,5 +1,7 @@
 """Repository pour les utilisateurs."""
 
+from collections.abc import Sequence
+
 from fastapi import HTTPException
 from sqlalchemy import select
 
@@ -11,9 +13,36 @@ from medbox.core.db.session import async_session_local
 class UserRepository(BaseRepository[User]):
     """Repository utilisateur."""
 
-    def __init__(self) -> None:
-        """Constructeur."""
+    def __init__(self, tenant_id: str | None = None) -> None:
+        """Constructeur.
+
+        Parameters
+        ----------
+        tenant_id : str | None
+            ID du tenant pour scoper les données (optionnel).
+
+        """
         super().__init__(User)
+        self.tenant_id = tenant_id
+
+    async def list(self) -> Sequence[User]:
+        """Renvoie l'ensemble des utilisateurs, scoped by tenant si fourni.
+
+        Returns
+        -------
+        Sequence[User]
+            Liste des utilisateurs.
+
+        """
+        async with async_session_local() as session:
+            stmt = select(self.model)
+
+            # Scope by tenant if provided
+            if self.tenant_id:
+                stmt = stmt.where(self.model.tenant_id == self.tenant_id)
+
+            result = await session.execute(stmt)
+            return result.scalars().all()
 
     async def get_by_subject(self, subject_id: str) -> User | None:
         """Récupère un enregistrement via son identifiant.
@@ -31,6 +60,11 @@ class UserRepository(BaseRepository[User]):
         """
         async with async_session_local() as session:
             stmt = select(self.model).where(self.model.keycloak_subject == subject_id)
+
+            # Scope by tenant if provided
+            if self.tenant_id:
+                stmt = stmt.where(self.model.tenant_id == self.tenant_id)
+
             result = await session.execute(stmt)
             return result.scalar_one_or_none()
 

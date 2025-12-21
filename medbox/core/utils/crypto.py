@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -25,7 +24,7 @@ def _build_fernet() -> Fernet:
 fernet = _build_fernet()
 
 
-def encrypt_str(value: Optional[str]) -> Optional[str]:
+def encrypt_str(value: str | None) -> str | None:
     """
     Chiffre une chaîne en utilisant Fernet.
     Retourne None si value est None.
@@ -36,7 +35,7 @@ def encrypt_str(value: Optional[str]) -> Optional[str]:
     return token.decode("utf-8")
 
 
-def decrypt_str(value: Optional[str]) -> Optional[str]:
+def decrypt_str(value: str | None) -> str | None:
     """
     Déchiffre une chaîne chiffrée Fernet.
     Retourne None si value est None.

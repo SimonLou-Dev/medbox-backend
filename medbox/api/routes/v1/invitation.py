@@ -1,13 +1,12 @@
 """Router pour la gestion des invitations."""
 
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Security
 from fastapi.responses import JSONResponse
 
 from medbox.api.deps.response import ok_response
 from medbox.core.constants.enums import UserRoles
-from medbox.core.db.models import User
 from medbox.core.dto.invitation import (
     ClaimInvitationDTO,
     ResponseInvitationDTO,
@@ -22,6 +21,9 @@ from medbox.core.services import (
     oauth2_scheme,
 )
 from medbox.core.services.tenant_right import require_tenant_role
+
+if TYPE_CHECKING:
+    from medbox.core.db.models import User
 
 router = APIRouter(prefix="/invite", tags=["invitation"])
 admin_router = APIRouter(prefix="/tenant/{tenant_id}/invite", tags=["invitation"])
@@ -51,7 +53,10 @@ async def accept_invitation(
 @admin_router.patch("/{invitation_id}/revoke", dependencies=[Security(oauth2_scheme)])
 async def revoke_invitation(
     invitation_id: str,
-    _: Annotated[UserContext, Depends(require_tenant_role(UserRoles.TENANT_ADMIN))],
+    _: Annotated[
+        UserContext,
+        Depends(require_tenant_role(UserRoles.TENANT_ADMIN)),
+    ],
     tenant_invite_svc: TenantInvitSvcDep,
 ) -> JSONResponse:
     """Permet de forcer l'expiration d'une invitation.
@@ -69,41 +74,65 @@ async def revoke_invitation(
     return ok_response
 
 
-@admin_router.post("/{invitation_id}/create", dependencies=[Security(oauth2_scheme)])
-async def create_invitation(
-    invitation_id: str,
-    _: Annotated[UserContext, Depends(require_tenant_role(UserRoles.TENANT_ADMIN))],
+@admin_router.post("/send", dependencies=[Security(oauth2_scheme)])
+async def send_invitation(
+    tenant_id: str,
+    target_email: str,
+    user_ctx: Annotated[
+        UserContext,
+        Depends(require_tenant_role(UserRoles.TENANT_ADMIN)),
+    ],
     tenant_invite_svc: TenantInvitSvcDep,
+    user_svc: UserSvcDep,
 ) -> ResponseInvitationWithCodeDTO:
-    """Permet de forcer l'expiration d'une invitation.
+    """Envoie une invitation pour joindre le tenant.
 
     Nécessite le rôle TENANT_ADMIN.
+    Route: POST /api/v1/tenant/{tenant_id}/invite/send
 
     Args:
-        invitation_id: UUID de l'invitation
-        _: Utilisateur authentifié avec rôle admin
+        tenant_id: UUID du tenant
+        target_email: Email de la personne à inviter
+        user_ctx: Utilisateur authentifié avec rôle admin
         tenant_invite_svc: Service des invitation tenants
+        user_svc: Service utilisateurs
+
+    Returns:
+        ResponseInvitationWithCodeDTO: Code d'invitation généré
+
+    Raises:
+        HTTPException: Si l'email existe déjà ou invitation en cours
 
     """
-    await tenant_invite_svc.expire_invitation(invitation_id)
-
-    return ok_response
+    sender = await user_svc.get_user_from_subject(user_ctx.subject)
+    invitation = await tenant_invite_svc.invite_user_to_tenant(
+        sender=sender,
+        target_mail=target_email,
+        tenant_id=tenant_id,
+    )
+    return ResponseInvitationWithCodeDTO(code=invitation.code)
 
 
 @admin_router.get("/", dependencies=[Security(oauth2_scheme)])
 async def list_invitations(
     tenant_id: str,
-    _: Annotated[UserContext, Depends(require_tenant_role(UserRoles.TENANT_ADMIN))],
+    _: Annotated[
+        UserContext,
+        Depends(require_tenant_role(UserRoles.TENANT_ADMIN)),
+    ],
     tenant_invite_svc: TenantInvitSvcDep,
 ) -> list[ResponseInvitationDTO]:
-    """Permet de lister les invitation d'un tenant.
+    """Lister les invitations d'un tenant.
 
     Nécessite le rôle TENANT_ADMIN.
 
     Args:
-        invitation_id: UUID de l'invitation
+        tenant_id: UUID du tenant
         _: Utilisateur authentifié avec rôle admin
         tenant_invite_svc: Service des invitation tenants
+
+    Returns:
+        list[ResponseInvitationDTO]: Liste des invitations du tenant
 
     """
     await tenant_invite_svc.get_paginated_invitations(tenant_id=tenant_id)

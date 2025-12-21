@@ -63,5 +63,9 @@ class Invitation(Base, IDMixin, TimestampMixin):
     )
 
     tenant: Mapped["Tenant"] = relationship(back_populates="invitations")
-    claimed_by_user: Mapped["User | None"] = relationship()
-    sended_by_user: Mapped["User"] = relationship()
+    claimed_by_user: Mapped["User | None"] = relationship(
+        foreign_keys=[claimed_by_user_id],
+    )
+    sended_by_user: Mapped["User"] = relationship(
+        foreign_keys=[sended_by_user_id],
+    )

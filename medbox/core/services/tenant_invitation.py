@@ -11,7 +11,8 @@ from medbox.core.db.models.user import User
 from medbox.core.db.repositories.invitation import InvitationRepository
 from medbox.core.db.repositories.tenant import TenantRepository
 from medbox.core.db.repositories.user import UserRepository
-from medbox.core.dto.invitation import PaginatedDTO, ResponseInvitationDTO
+from medbox.core.dto.invitation import ResponseInvitationDTO
+from medbox.core.dto.page import PaginatedDTO
 from medbox.core.exceptions import ModelNotFoundError
 from medbox.core.tasks import expire_invitation
 

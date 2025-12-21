@@ -2,6 +2,7 @@
 
 import subprocess
 
+
 def run():
     subprocess.run(
         ["dramatiq", "medbox.schedulerworker.main"],

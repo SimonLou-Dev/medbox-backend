@@ -1,10 +1,11 @@
 # tests/test_crypto.py
 
-from medbox.core.utils.crypto import encrypt_str, decrypt_str
+from medbox.core.utils.crypto import decrypt_str, encrypt_str
 
 
-def test_encrypt_decrypt_str():
-    secret = "bonjour le monde"
+def test_encrypt_decrypt_str() -> None:
+    """Test encryption and decryption of strings."""
+    secret = "bonjour le monde"  # noqa: S105
 
     encrypted = encrypt_str(secret)
     assert encrypted != secret

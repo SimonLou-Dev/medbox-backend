@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import uuid  # noqa: TCH003
+import uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, String

@@ -47,12 +47,13 @@ pytest = "^8.0"
 pytest-asyncio = "^1.3.0"
 httpx = "^0.27"
 ruff = "^0.6"
+aiosqlite = "^0.22.0"
 
 [tool.poetry.scripts]
 api = "medbox.api.main:run"
 api-dev = "medbox.api.main:run_dev"
-scheduler-worker = "medbox.scheduler-worker.__main__:run"
-iot-worker = "medbox.iot-worker.__main__:run"
+scheduler-worker = "medbox.schedulerworker.__main__:run"
+iot-worker = "medbox.iotworker.__main__:run"
 
 # ============================================================================
 # RUFF CONFIGURATION

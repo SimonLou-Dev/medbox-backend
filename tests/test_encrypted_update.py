@@ -9,14 +9,13 @@ from medbox.core.db.models.patient import Patient
 
 
 @pytest.mark.asyncio
-async def test_encrypted_update(test_session):
+async def test_encrypted_update(db_session):
     tenant = Tenant(
         name=f"test tenant {uuid.uuid4()}",
     )
 
-    test_session.add(tenant)
-    await test_session.commit()
-
+    db_session.add(tenant)
+    await db_session.commit()
 
     patient = Patient(
         id=uuid.uuid4(),
@@ -27,11 +26,11 @@ async def test_encrypted_update(test_session):
         c_phone="0600000000",
     )
 
-    test_session.add(patient)
-    await test_session.commit()
+    db_session.add(patient)
+    await db_session.commit()
 
     patient.c_first_name = "Bob"
-    await test_session.commit()
+    await db_session.commit()
 
-    result = await test_session.get(Patient, patient.id)
+    result = await db_session.get(Patient, patient.id)
     assert result.c_first_name == "Bob"

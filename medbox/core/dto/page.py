@@ -1,5 +1,7 @@
 """DTO de pagination."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 from typing import Generic, TypeVar
 
@@ -23,7 +25,7 @@ class PaginatedDTO(BaseModel, Generic[T]):
     def to_dto_page(
         page_obj: Page,
         dto_cls: type[T],
-    ) -> "PaginatedDTO"[T]:
+    ) -> PaginatedDTO[T]:
         # Convertit chaque élément via from_model() du DTO
         items = [dto_cls.from_model(item) for item in page_obj.items]
 

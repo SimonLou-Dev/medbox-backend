@@ -1,5 +1,7 @@
 """Repository générique."""
 
+from __future__ import annotations
+
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar

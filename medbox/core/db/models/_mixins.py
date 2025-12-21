@@ -1,4 +1,4 @@
-import uuid  # noqa: EXE002
+import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime

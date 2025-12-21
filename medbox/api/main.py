@@ -7,18 +7,20 @@ app = FastAPI(title="MedBox API", root_path=settings.url_prefix)
 app.include_router(router_v1)
 
 
-def run():
+def run() -> None:
+    """Run production server."""
     import uvicorn
 
-    uvicorn.run("medbox.api.main:app", host="0.0.0.0", port=8000)
+    uvicorn.run("medbox.api.main:app", host="0.0.0.0", port=8000)  # noqa: S104
 
 
-def run_dev():
+def run_dev() -> None:
+    """Run development server with auto-reload."""
     import uvicorn
 
     uvicorn.run(
         "medbox.api.main:app",
-        host="0.0.0.0",
+        host="0.0.0.0",  # noqa: S104
         port=8000,
         reload=True,
         reload_dirs=["medbox/api", "medbox/core"],
