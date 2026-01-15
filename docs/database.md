@@ -47,13 +47,16 @@ erDiagram
     }
 
     GLOBAL_MEDICATION {
-        string id
-        string name
-        string form
-        string identifier_code
-        string brand
-        string short_description
-        string created_by
+        integer cis "Primary key from French API"
+        string elementPharmaceutique
+        string formePharmaceutique
+        json voiesAdministration "Array of routes"
+        string statusAutorisation
+        string typeProcedure
+        string etatComercialisation
+        date dateAMM
+        string titulaire
+        datetime sync_date
         datetime created_at
         datetime updated_at
     }
@@ -341,19 +344,36 @@ Profil médical d’un patient.
 ---
 
 ### GLOBAL_MEDICATION
-Référentiel global de médicaments (non tenant-scopé).
 
-| Champ | Type | Description |
+Referential database of French medications from the BDPM (Base de Données Publique des Médicaments). 
+Data is synced from the external API (https://medicaments-api.giygas.dev) 2x daily (6h/18h).
+This table is **NOT tenant-scoped** and is shared across all tenants.
+
+Used for:
+- Prescription line lookups to identify medications by name/CIS code
+- Medication search for prescribers  
+- Ensuring prescribed medications are valid in the BDPM
+
+| Field | Type | Description |
 |-------|------|-------------|
-| id | UUID | Identifiant |
-| name | string | Nom |
-| form | string | Forme (comprimé…) |
-| identifier_code | string | Code interne |
-| brand | string | Marque |
-| short_description | string | Description courte |
-| created_by | UUID | FK user_creator |
-| created_at | datetime | Création |
-| updated_at | datetime | MAJ |
+| cis | integer | CIS Code (Code Identifiant de Spécialité) - Primary identifier from French API |
+| elementPharmaceutique | string | Pharmaceutical element / product name (e.g., "PARACETAMOL MYLAN 1 g, comprimé") |
+| formePharmaceutique | string | Pharmaceutical form (tablet, capsule, syrup, etc.) |
+| voiesAdministration | json | Array of administration routes (e.g., ["orale", "intramusculaire"]) |
+| statusAutorisation | string | Authorization status ("Autorisation active", "Suspension", etc.) |
+| typeProcedure | string | Procedure type ("Procédure nationale", "Procédure centralisée", etc.) |
+| etatComercialisation | string | Commercialization state ("Commercialisée", "Non commercialisée", etc.) |
+| dateAMM | date | Marketing Authorization Date (Date d'Autorisation de Mise sur le Marché) |
+| titulaire | string | License holder / manufacturer name (e.g., "MYLAN SAS") |
+| sync_date | datetime | Last successful sync from external API |
+| created_at | datetime | Record creation timestamp |
+| updated_at | datetime | Record last update timestamp |
+
+**Notes:**
+- The `cis` field is the primary identifier and unique key
+- Data is read-only at API level (synced via scheduled background jobs from external API)
+- Full-text search available on `elementPharmaceutique` and `titulaire` for prescription lookup
+- `voiesAdministration` stored as JSON array for flexible querying
 
 ---
 

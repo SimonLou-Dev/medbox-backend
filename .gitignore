@@ -86,7 +86,7 @@ dist/
 *.csr
 *.p12
 *.env
-.env*
+.env
 *.token
 secrets/
 secret/

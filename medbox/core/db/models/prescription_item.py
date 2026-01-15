@@ -29,8 +29,8 @@ class PrescriptionItem(Base, IDMixin, TimestampMixin):
         nullable=False,
     )
 
-    medication_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("global_medications.id", ondelete="SET NULL"),
+    medication_cis: Mapped[int | None] = mapped_column(
+        ForeignKey("global_medications.cis", ondelete="SET NULL"),
         nullable=True,
     )
 
