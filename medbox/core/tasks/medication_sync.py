@@ -9,6 +9,7 @@ import httpx
 
 from medbox.core.db.models.global_medication import GlobalMedication
 from medbox.core.db.repositories.global_medication import GlobalMedicationRepository
+from medbox.core.filters import is_medbox_1_compatible
 from medbox.schedulerworker import broker  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ def sync_medications_from_api() -> dict:
         asyncio.set_event_loop(loop)
 
         try:
-            inserted, updated, errors = loop.run_until_complete(
+            inserted, updated, filtered, errors = loop.run_until_complete(
                 _save_medications(medications_data),
             )
         finally:
@@ -68,7 +69,8 @@ def sync_medications_from_api() -> dict:
 
         logger.info(
             f"✅ Medication sync completed: "
-            f"{inserted} new, {updated} updated, {errors} errors (total: {total_count})",
+            f"{inserted} new, {updated} updated, {filtered} filtered, {errors} errors "
+            f"(total: {total_count})",
         )
 
         result = {
@@ -76,6 +78,7 @@ def sync_medications_from_api() -> dict:
             "total": total_count,
             "inserted": inserted,
             "updated": updated,
+            "filtered": filtered,
             "errors": errors,
             "timestamp": datetime.utcnow().isoformat(),
         }
@@ -106,24 +109,36 @@ async def _fetch_api_data() -> dict | list:
         raise
 
 
-async def _save_medications(medications_data: list) -> tuple[int, int, int]:
+async def _save_medications(medications_data: list) -> tuple[int, int, int, int]:
     """Save medications to database.
-    
-    Returns tuple of (inserted_count, updated_count, errors_count)
+
+    Filters medications to only save those compatible with MedBox 1 (5cm x 5cm x 5cm).
+
+    Returns tuple of (inserted_count, updated_count, filtered_count, errors_count)
     """
     repo = GlobalMedicationRepository()
     inserted = 0
     updated = 0
+    filtered = 0
     errors = 0
 
     for med_data in medications_data:
         try:
             cis = med_data.get("cis")
-            
+            form = med_data.get("formePharmaceutique", "")
+
+            # Check if medication form is compatible with MedBox 1
+            if not is_medbox_1_compatible(form):
+                logger.debug(
+                    f"Filtered out medication CIS {cis}: form '{form}' not compatible"
+                )
+                filtered += 1
+                continue
+
             # Check if medication already exists
             existing = await repo.get_by_cis(cis)
             is_new = existing is None
-            
+
             # Parse dateAMM from DD/MM/YYYY format
             date_amm = None
             if med_data.get("dateAMM"):
@@ -140,7 +155,7 @@ async def _save_medications(medications_data: list) -> tuple[int, int, int]:
                 element_pharmaceutique=med_data.get(
                     "elementPharmaceutique",
                 ),
-                forme_pharmaceutique=med_data.get("formePharmaceutique"),
+                forme_pharmaceutique=form,
                 voies_administration=med_data.get("voiesAdministration"),
                 status_autorisation=med_data.get("statusAutorisation"),
                 type_procedure=med_data.get("typeProcedure"),
@@ -164,4 +179,4 @@ async def _save_medications(medications_data: list) -> tuple[int, int, int]:
             errors += 1
             continue
 
-    return inserted, updated, errors
+    return inserted, updated, filtered, errors
