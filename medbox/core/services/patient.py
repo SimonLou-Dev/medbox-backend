@@ -172,7 +172,7 @@ class PatientService:
             external_id=data.external_id,
         )
 
-        created_patient = await self.patient_repo.create(patient)
+        created_patient = await self.patient_repo.add(patient)
         return PatientResponse.model_validate(created_patient)
 
     async def update(self, patient_id: UUID, data: PatientRequest) -> PatientResponse:

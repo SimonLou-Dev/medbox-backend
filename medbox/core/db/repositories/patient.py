@@ -6,7 +6,9 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from medbox.core.db.models.patient import Patient
 from medbox.core.db.repositories.base import BaseRepository, Page
@@ -219,3 +221,58 @@ class PatientRepository(BaseRepository[Patient]):
                 total=total,
                 total_pages=total_pages,
             )
+
+    async def create(self, patient: Patient) -> Patient:
+        """Create a new patient.
+
+        Parameters
+        ----------
+        patient : Patient
+            Patient instance to create
+
+        Returns
+        -------
+        Patient
+            Created patient
+
+        Raises
+        ------
+        HTTPException
+            If external_id already exists for this tenant
+
+        """
+        async with async_session_local() as session:
+            session.add(patient)
+            try:
+                await session.commit()
+            except IntegrityError as exc:
+                await session.rollback()
+                raise HTTPException(
+                    400, "Patient with this external_id already exists"
+                ) from exc
+            await session.refresh(patient)
+            return patient
+
+    async def update(self, patient: Patient) -> Patient:
+        """Update an existing patient.
+
+        Parameters
+        ----------
+        patient : Patient
+            Patient instance with updated values
+
+        Returns
+        -------
+        Patient
+            Updated patient
+
+        """
+        async with async_session_local() as session:
+            session.add(patient)
+            try:
+                await session.commit()
+            except IntegrityError as exc:
+                await session.rollback()
+                raise HTTPException(400, "Update failed: constraint violation") from exc
+            await session.refresh(patient)
+            return patient

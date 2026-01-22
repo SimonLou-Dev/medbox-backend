@@ -1,16 +1,8 @@
-import dramatiq
-from dramatiq.brokers.redis import RedisBroker
-from dramatiq.middleware import AgeLimit, Retries
+# medbox/schedulerworker/main.py
 
-from medbox.schedulerworker.broker import broker
 
-broker = RedisBroker(url="redis://redis:6379")
-broker.add_middleware(Retries(max_retries=3))
-broker.add_middleware(AgeLimit(max_age=60_000))
-
-from medbox.core.tasks import *
-
-dramatiq.set_broker(broker)
+from medbox.core import tasks  # noqa: F401
+from medbox.schedulerworker import broker_config  # noqa: F401
 
 
 def run():

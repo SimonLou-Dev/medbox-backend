@@ -1,6 +1,6 @@
 """DTOs for patient management."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, ClassVar
 from uuid import UUID
 
@@ -32,7 +32,10 @@ class PatientResponse(BaseModel):
         None,
         description="Patient phone number (encrypted)",
     )
-    birth_date: datetime | None = Field(None, description="Patient birth date")
+    birth_date: date | None = Field(
+        None,
+        description="Patient birth date format YYYY-MM-DD",
+    )
     created_at: datetime = Field(..., description="Creation date")
     updated_at: datetime = Field(..., description="Last modification date")
 

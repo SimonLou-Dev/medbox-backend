@@ -9,9 +9,11 @@ from medbox.core.dto.patient import PatientListResponse, PatientRequest, Patient
 from medbox.core.services import (
     CurrentUser,
     TenantRightSvcDep,
+    get_user_service,
     oauth2_scheme,
 )
 from medbox.core.services.patient import PatientService
+from medbox.core.services.user import UserService
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
 
@@ -20,13 +22,15 @@ router = APIRouter(prefix="/patients", tags=["Patients"])
 # ==============================================================================
 
 
-def get_patient_service(
+async def get_patient_service(
     user: CurrentUser,
     tenant_right_svc: TenantRightSvcDep,
+    user_svc: Annotated[UserService, Depends(get_user_service)],
 ) -> PatientService:
     """Create a patient service instance."""
+    db_user = await user_svc.get_user_from_subject(user.subject)
     return PatientService(
-        tenant_id=user.tenant_id,
+        tenant_id=db_user.tenant_id,
         tenant_right_svc=tenant_right_svc,
     )
 

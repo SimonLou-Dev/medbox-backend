@@ -1,5 +1,7 @@
 import dramatiq
 
+from medbox.schedulerworker import broker  # noqa: F401
+
 
 @dramatiq.actor(queue_name="tenant_invitation")
 async def expire_invitation(invite_id: str) -> None:

@@ -8,6 +8,7 @@ and is NOT tenant-scoped (shared across all tenants).
 from __future__ import annotations
 
 from datetime import date, datetime
+from functools import partial
 
 from sqlalchemy import JSON, Date, DateTime, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -84,20 +85,26 @@ class GlobalMedication(Base):
     sync_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
+        default=partial(datetime.now),
         comment="Last successful sync from external API",
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
+        DateTime(timezone=True),
+        nullable=False,
+        default=partial(datetime.now),
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
+        DateTime(timezone=True),
+        nullable=False,
+        default=partial(datetime.now),
     )
 
     # Indices for common search operations
     __table_args__ = (
         Index(
-            "idx_global_medications_element_pharmaceutique", "element_pharmaceutique"
+            "idx_global_medications_element_pharmaceutique",
+            "element_pharmaceutique",
         ),
         Index("idx_global_medications_titulaire", "titulaire"),
     )

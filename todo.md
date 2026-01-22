@@ -19,6 +19,8 @@
 
 ## 🚧 En cours d'implémentation
 
+URGENT : Test de test_patient.py test_global_medication.py
+
 ### 1. IoT Worker (MQTT → DB) — **PRIORITÉ: HAUTE**
 
 **Responsabilité**: Subscribe `medbox/box/+/evt/#`, valider, écrire en DB, déclencher actions.

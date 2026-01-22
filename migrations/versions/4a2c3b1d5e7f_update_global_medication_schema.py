@@ -44,11 +44,11 @@ def upgrade() -> None:
         sa.Index('idx_global_medications_titulaire', 'titulaire'),
     )
     
-    # Update prescription_items table: change medication_id from UUID to INTEGER (cis)
-    op.alter_column('prescription_items', 'medication_id', 
-                    existing_type=sa.Uuid(),
-                    type_=sa.Integer(),
-                    nullable=True)
+    # Update prescription_items table: Set medication_id to NULL first (drop UUID references)
+    op.execute("UPDATE prescription_items SET medication_id = NULL")
+    
+    # Change medication_id column type from UUID to INTEGER with explicit USING clause
+    op.execute("ALTER TABLE prescription_items ALTER COLUMN medication_id TYPE INTEGER USING NULL")
     
     # Re-add foreign key constraint with new column type
     op.create_foreign_key('prescription_items_medication_id_fkey', 

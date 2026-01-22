@@ -14,6 +14,8 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    time_zone: str = Field(default="Europe/Paris", alias="TIMEZONE")
+
     # --- Database ---
     database_host: str = Field(alias="DATABASE_HOST")
     database_port: int = Field(default=5432, alias="DATABASE_PORT")

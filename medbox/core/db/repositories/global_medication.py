@@ -154,3 +154,47 @@ class GlobalMedicationRepository(BaseRepository[GlobalMedication]):
             stmt = select(func.count()).select_from(self.model)
             result = await session.execute(stmt)
             return result.scalar() or 0
+
+    async def upsert_medication(
+        self,
+        medication: GlobalMedication,
+    ) -> GlobalMedication:
+        """Insert or update medication by CIS (upsert).
+
+        Safely handles concurrent inserts by checking if medication exists
+        before inserting. If it already exists, updates sync_date.
+
+        Parameters
+        ----------
+        medication : GlobalMedication
+            Medication to insert or update
+
+        Returns
+        -------
+        GlobalMedication
+            The medication (inserted or existing with updated sync_date)
+
+        """
+        from datetime import datetime
+
+        async with async_session_local() as session:
+            # First, check if medication already exists
+            stmt = select(self.model).where(self.model.cis == medication.cis)
+            result = await session.execute(stmt)
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                # Update sync_date for existing medication
+                existing.sync_date = datetime.now()
+                existing.updated_at = datetime.now()
+                await session.merge(existing)
+                await session.commit()
+                await session.refresh(existing)
+                return existing
+
+            # Medication doesn't exist, insert it
+            session.add(medication)
+            await session.commit()
+            await session.refresh(medication)
+
+            return medication

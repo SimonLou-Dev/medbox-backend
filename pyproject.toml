@@ -40,7 +40,9 @@ redis = "5.0.1"
 tenacity = "8.2.3"
 
 # Task Queue
-dramatiq = "1.15.0"
+dramatiq = "2.0.1"
+apscheduler = "^3.10.4"
+dramatiq-crontab = "^1.0.12"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
