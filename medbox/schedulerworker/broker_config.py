@@ -5,8 +5,10 @@ import logging
 import dramatiq
 from dramatiq.brokers.redis import RedisBroker
 from dramatiq.middleware import AgeLimit, AsyncIO, Retries, TimeLimit
+from medbox.core.config.settings import settings
 
 logger = logging.getLogger(__name__)
+
 
 
 def configure_broker() -> RedisBroker:
@@ -17,7 +19,7 @@ def configure_broker() -> RedisBroker:
 
     """
     # Create Redis broker
-    broker = RedisBroker(url="redis://redis:6379")
+    broker = RedisBroker(url=settings.redis_url)
 
     # Add middleware
     broker.add_middleware(AsyncIO())
