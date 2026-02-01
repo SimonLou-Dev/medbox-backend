@@ -6,4 +6,8 @@ on:
     branches: ['prod', 'dev', 'testing']
 jobs:
   docker:
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/docker.yaml
+  
