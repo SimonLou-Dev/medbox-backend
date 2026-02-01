@@ -1,10 +1,36 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from medbox.api.routes.router_v1 import router_v1
 from medbox.core.config.settings import settings
 
 app = FastAPI(title="MedBox API", root_path=settings.url_prefix)
 app.include_router(router_v1)
+
+allowed_origins = [
+    "https://medbox.theokaszak.fr",
+    "https://api.medbox.theokaszak.fr",
+    # Dev front (exemples)
+    "http://localhost:8000",
+    "http://localhost:8001",
+    # Optionnel: si tu utilises Vite/React/Next avec un autre port
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:3001",
+    "http://localhost:5174",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    # Si tu utilises des cookies (session, auth), mets True.
+    # Sinon laisse False pour éviter d'ouvrir inutilement.
+    allow_credentials=True,
+    # Méthodes autorisées
+    allow_methods=["*"],
+    # Headers autorisés (Authorization utile pour JWT)
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")
