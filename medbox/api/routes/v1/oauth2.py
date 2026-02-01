@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Cookie, HTTPException, Query, Security, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
+from medbox.api.routes import v1
 from medbox.core.config.settings import settings
 from medbox.core.dto.auth import MeResponse, RefreshTokenRequest, TokenResponse
 from medbox.core.services import CurrentUser, SecuritySvcDep, UserSvcDep, oauth2_scheme
@@ -32,7 +33,11 @@ async def login(
         Redirection vers Keycloak
 
     """
-    backend_callback = f"{settings.app_url}{settings.url_prefix}/v1/oauth2/callback"
+    backend_callback = f"{settings.app_url}"
+
+    if settings.url_prefix:
+        backend_callback += f"/{settings.url_prefix}"
+    backend_callback += "/v1/oauth2/callback"
 
     # Paramètres de base
     params = {
