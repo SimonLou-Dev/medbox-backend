@@ -12,6 +12,7 @@ on:
     branches:
       - main
       - develop
+  workflow_call:
 
 env:
   REGISTRY: ghcr.io
