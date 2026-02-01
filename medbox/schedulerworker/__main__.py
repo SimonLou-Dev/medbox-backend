@@ -6,5 +6,9 @@ import subprocess
 def run():
     subprocess.run(
         ["dramatiq", "medbox.schedulerworker.main"],
-        check=True
+        check=True,
     )
+
+
+if __name__ == "__main__":
+    run()
