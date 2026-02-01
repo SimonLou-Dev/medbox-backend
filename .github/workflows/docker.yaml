@@ -52,19 +52,21 @@ jobs:
       - name: Extract metadata
         id: meta
         run: |
-          # Get commit short SHA
           COMMIT_SHA=$(git rev-parse --short HEAD)
-          
-          # Get branch name (without refs/heads/)
+
+          # Branch or tag
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             BRANCH_TAG=${GITHUB_REF#refs/tags/}
           else
             BRANCH_TAG=${GITHUB_REF#refs/heads/}
           fi
-          
+
+          # Lowercase repo name (required by docker/ghcr)
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+
           echo "commit_sha=${COMMIT_SHA}" >> $GITHUB_OUTPUT
           echo "branch_tag=${BRANCH_TAG}" >> $GITHUB_OUTPUT
-          echo "image_name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}" >> $GITHUB_OUTPUT
+          echo "image_name=${{ env.REGISTRY }}/${REPO_LC}-${{ matrix.service }}" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
