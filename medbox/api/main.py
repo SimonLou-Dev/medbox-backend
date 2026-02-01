@@ -30,14 +30,14 @@ async def startup_event() -> None:
         raise
 
     # Initialize scheduler for medication sync
-    print("⏰ Initializing medication sync scheduler...")
+    print("⏰ Syncing medications from API: medicaments-api.giygas.dev...")
     try:
-        from medbox.core.tasks.scheduler import init_scheduler
+        from medbox.core.tasks.medication_sync import sync_medications_from_api
 
-        init_scheduler()
-        print("✅ Scheduler initialized (daily sync at 2 AM)")
+        sync_medications_from_api.send()
     except Exception as e:
-        print(f"⚠️  Scheduler initialization warning: {e}")
+        print(f"⚠️  Medication sync error: {e}")
+        raise
 
 
 def run() -> None:
