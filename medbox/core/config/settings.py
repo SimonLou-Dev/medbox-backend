@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     )
 
     app_url: str = Field(alias="APP_URL", default="http://localhost:8000")
-    url_prefix: str = Field(alias="URL_PREFIX", default="/api")
+    url_prefix: str | None = Field(alias="URL_PREFIX", default=None)
 
     # --- Misc ---
     environment: str = "development"
