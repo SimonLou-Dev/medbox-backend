@@ -1,0 +1,9 @@
+name: Node.js prod CI
+on:
+  push:
+    branches: ['prod', 'dev', 'testing']
+  pull_request:
+    branches: ['prod', 'dev', 'testing']
+jobs:
+  docker:
+    uses: ./.github/workflows/docker.yml

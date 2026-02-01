@@ -1,0 +1,45 @@
+# Multi-stage build for Worker (Dramatiq + APScheduler)
+FROM python:3.11-alpine AS builder
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev libffi-dev openssl-dev
+
+# Copy dependency files
+COPY pyproject.toml poetry.lock* ./
+
+# Export dependencies and install
+RUN pip install poetry==1.7.1 && \
+    python -m venv /opt/venv && \
+    /opt/venv/bin/pip install --upgrade pip setuptools && \
+    poetry export -f requirements.txt --only main | /opt/venv/bin/pip install -r /dev/stdin && \
+    pip uninstall -y poetry
+
+# Runtime stage
+FROM python:3.11-alpine
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+# Copy venv from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy application
+COPY medbox ./medbox
+COPY migrations ./migrations
+COPY alembic.ini ./
+
+# Create non-root user
+RUN adduser -D -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Run worker (Dramatiq + APScheduler) with unbuffered logging
+CMD ["python", "-u", "-m", "medbox.schedulerworker"]

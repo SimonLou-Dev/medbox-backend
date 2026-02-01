@@ -1,0 +1,134 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: medbox-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-medbox}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-medbox_password}
+      POSTGRES_DB: ${DB_NAME:-medbox_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-medbox}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medbox-network
+
+  # Redis for Dramatiq Task Queue
+  redis:
+    image: redis:7-alpine
+    container_name: medbox-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medbox-network
+
+  # FastAPI Application Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: medbox-api
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-medbox}:${DB_PASSWORD:-medbox_password}@postgres:5432/${DB_NAME:-medbox_db}
+      # Redis
+      REDIS_URL: redis://redis:6379
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8080}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-medbox}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-medbox-api}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-}
+      # Environment
+      ENV: ${ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./medbox:/app/medbox
+      - ./migrations:/app/migrations
+    networks:
+      - medbox-network
+    restart: unless-stopped
+
+  # Scheduler Worker (APScheduler + Dramatiq Message Sender)
+  scheduler-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler-worker
+    container_name: medbox-scheduler-worker
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-medbox}:${DB_PASSWORD:-medbox_password}@postgres:5432/${DB_NAME:-medbox_db}
+      # Redis
+      REDIS_URL: redis://redis:6379
+      # Environment
+      ENV: ${ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./medbox:/app/medbox
+      - ./migrations:/app/migrations
+    networks:
+      - medbox-network
+    restart: unless-stopped
+
+  # Queue Worker (Dramatiq Task Executor)
+  queue-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.queue-worker
+    container_name: medbox-queue-worker
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-medbox}:${DB_PASSWORD:-medbox_password}@postgres:5432/${DB_NAME:-medbox_db}
+      # Redis
+      REDIS_URL: redis://redis:6379
+      # External APIs
+      MEDICATIONS_API_URL: ${MEDICATIONS_API_URL:-https://medicaments-api.giygas.dev}
+      # Environment
+      ENV: ${ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./medbox:/app/medbox
+      - ./migrations:/app/migrations
+    networks:
+      - medbox-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  medbox-network:
+    driver: bridge

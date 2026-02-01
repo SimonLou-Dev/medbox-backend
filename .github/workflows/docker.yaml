@@ -1,0 +1,142 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - staging
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        service:
+          - api
+          - iotworker
+          - worker
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          # Get commit short SHA
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          
+          # Get branch name (without refs/heads/)
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            BRANCH_TAG=${GITHUB_REF#refs/tags/}
+          else
+            BRANCH_TAG=${GITHUB_REF#refs/heads/}
+          fi
+          
+          echo "commit_sha=${COMMIT_SHA}" >> $GITHUB_OUTPUT
+          echo "branch_tag=${BRANCH_TAG}" >> $GITHUB_OUTPUT
+          echo "image_name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.${{ matrix.service }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.commit_sha }}
+            ${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.branch_tag }}
+            ${{ steps.meta.outputs.image_name }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+      - name: Image digest
+        run: echo ${{ steps.docker_build.outputs.digest }}
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: read
+
+    strategy:
+      matrix:
+        service:
+          - api
+          - iotworker
+          - worker
+
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## Docker Images
+
+            Images are available at:
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:${{ github.ref_name }}`
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-iotworker:${{ github.ref_name }}`
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-worker:${{ github.ref_name }}`
+
+            Commit: `${{ github.sha }}`
+          draft: false
+          prerelease: false

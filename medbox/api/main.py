@@ -9,17 +9,35 @@ app.include_router(router_v1)
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    """Initialize scheduler on app startup.
+    """Initialize database migrations and scheduler on app startup.
 
-    The scheduler will send Dramatiq tasks to the queue at 2 AM daily.
-    If Redis is unavailable, the scheduler initialization is gracefully handled.
+    1. Runs pending database migrations via Alembic
+    2. Initializes APScheduler to send Dramatiq tasks at 2 AM daily
     """
-    print("API server started")
-    print("Lancement de la tâche de fond pour la synchronisation des médicaments.")
+    print("🚀 API server started")
 
-    from medbox.core.tasks.medication_sync import sync_medications_from_api
+    # Run database migrations
+    print("📦 Running database migrations...")
+    try:
+        from alembic import command
+        from alembic.config import Config
 
-    sync_medications_from_api.send()
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
+        print("✅ Migrations completed successfully")
+    except Exception as e:
+        print(f"⚠️  Migration error: {e}")
+        raise
+
+    # Initialize scheduler for medication sync
+    print("⏰ Initializing medication sync scheduler...")
+    try:
+        from medbox.core.tasks.scheduler import init_scheduler
+
+        init_scheduler()
+        print("✅ Scheduler initialized (daily sync at 2 AM)")
+    except Exception as e:
+        print(f"⚠️  Scheduler initialization warning: {e}")
 
 
 def run() -> None:

@@ -10,6 +10,7 @@ import httpx
 from medbox.core.db.models.global_medication import GlobalMedication
 from medbox.core.db.repositories.global_medication import GlobalMedicationRepository
 from medbox.core.filters import is_medbox_1_compatible
+from medbox.core.utils.redis_lock import get_task_lock
 from medbox.schedulerworker import broker  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -26,10 +27,35 @@ def sync_medications_from_api() -> dict:
     Dramatiq task that fetches the complete database from the external API
     and updates the local global_medications table.
 
+    This task uses a Redis lock to ensure only one instance runs at a time
+    across all API instances, with a 1-hour rate limit.
+
     Returns:
         dict: Sync result with counts (total, inserted, errors)
 
     """
+    # Acquire distributed lock with 1-hour rate limit
+    lock = get_task_lock("sync_medications_from_api", max_age_minutes=60)
+
+    try:
+        if not lock.acquire():
+            logger.info(
+                "⏭️  Medication sync already running or rate-limited. "
+                "Max once per hour.",
+            )
+            return {
+                "status": "skipped",
+                "reason": "Rate limited - max once per hour",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+    except RuntimeError as e:
+        logger.warning(f"⏭️  {e}")
+        return {
+            "status": "skipped",
+            "reason": str(e),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
     logger.info("🔄 Starting medication sync from French BDPM API...")
 
     try:
@@ -93,6 +119,10 @@ def sync_medications_from_api() -> dict:
             "error": str(e),
             "timestamp": datetime.utcnow().isoformat(),
         }
+    finally:
+        # Release the lock when done
+        lock.release()
+        logger.info("🔓 Released medication sync lock")
 
 
 async def _fetch_api_data() -> dict | list:
@@ -130,7 +160,7 @@ async def _save_medications(medications_data: list) -> tuple[int, int, int, int]
             # Check if medication form is compatible with MedBox 1
             if not is_medbox_1_compatible(form):
                 logger.debug(
-                    f"Filtered out medication CIS {cis}: form '{form}' not compatible"
+                    f"Filtered out medication CIS {cis}: form '{form}' not compatible",
                 )
                 filtered += 1
                 continue
