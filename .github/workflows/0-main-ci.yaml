@@ -6,4 +6,4 @@ on:
     branches: ['prod', 'dev', 'testing']
 jobs:
   docker:
-    uses: ./.github/workflows/docker.yml
+    uses: ./.github/workflows/docker.yaml
