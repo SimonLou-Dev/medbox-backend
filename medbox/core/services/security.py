@@ -212,6 +212,11 @@ class SecurityService:
 
         """
         async with httpx.AsyncClient(timeout=5.0) as client:
+            backend_callback = f"{settings.app_url}"
+
+            if settings.url_prefix:
+                backend_callback += f"/{settings.url_prefix}"
+            backend_callback += "/v1/oauth2/callback"
             response = await client.post(
                 self.token_endpoint,
                 data={
@@ -219,7 +224,7 @@ class SecurityService:
                     "code": code,
                     "client_id": settings.keycloak_client_id,
                     "client_secret": settings.keycloak_client_secret,
-                    "redirect_uri": f"{settings.app_url}{settings.url_prefix}/v1/oauth2/callback",
+                    "redirect_uri": backend_callback,
                 },
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )

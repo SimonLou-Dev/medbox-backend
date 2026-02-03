@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
         logger.error("⚠️  Migration error: %s", e, exc_info=True)
         raise
 
-    logger.info("⏰ Initializing scheduler...")
+    logger.info("⏰ Initializing scheduler...")  # Inici c'es c&ssé
     try:
         from medbox.core.tasks.scheduler import init_scheduler
 
