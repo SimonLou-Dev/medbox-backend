@@ -1,10 +1,25 @@
+import logging
+import sys
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from medbox.api.routes.router_v1 import router_v1
 from medbox.core.config.settings import settings
 
-app = FastAPI(title="MedBox API", root_path=settings.url_prefix)
+# Configure logging to stdout
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
+logger = logging.getLogger(__name__)
+
+# FastAPI root_path must be string, not None
+root_path = settings.url_prefix or ""
+
+app = FastAPI(title="MedBox API", root_path=root_path)
 app.include_router(router_v1)
 
 allowed_origins = [
@@ -40,30 +55,32 @@ async def startup_event() -> None:
     1. Runs pending database migrations via Alembic
     2. Initializes APScheduler to send Dramatiq tasks at 2 AM daily
     """
-    print("🚀 API server started")
+    logger.info("🚀 API server started")
+    logger.info(f"APP_URL: {settings.app_url}")
+    logger.info(f"URL_PREFIX: {settings.url_prefix}")
 
     # Run database migrations
-    print("📦 Running database migrations...")
+    logger.info("📦 Running database migrations...")
     try:
         from alembic import command
         from alembic.config import Config
 
         alembic_cfg = Config("alembic.ini")
         command.upgrade(alembic_cfg, "head")
-        print("✅ Migrations completed successfully")
+        logger.info("✅ Migrations completed successfully")
     except Exception as e:
-        print(f"⚠️  Migration error: {e}")
+        logger.error(f"⚠️  Migration error: {e}", exc_info=True)
         raise
 
     # Initialize scheduler for medication sync
-    print("⏰ Syncing medications from API: medicaments-api.giygas.dev...")
+    logger.info("⏰ Initializing scheduler...")
     try:
-        from medbox.core.tasks.medication_sync import sync_medications_from_api
+        from medbox.core.tasks.scheduler import init_scheduler
 
-        sync_medications_from_api.send()
+        init_scheduler()
+        logger.info("✅ Scheduler initialized (daily sync at 2 AM)")
     except Exception as e:
-        print(f"⚠️  Medication sync error: {e}")
-        raise
+        logger.warning(f"⚠️  Scheduler initialization warning: {e}", exc_info=True)
 
 
 def run() -> None:
