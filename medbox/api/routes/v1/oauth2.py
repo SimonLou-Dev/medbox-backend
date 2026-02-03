@@ -252,8 +252,8 @@ def _set_auth_cookies(
     """
     cookie_config = {
         "httponly": True,
-        "secure": settings.environment == "production",
-        "samesite": "lax",
+        "secure": True,
+        "samesite": "none",
         "max_age": 3600,  # 1 heure pour l'access token
     }
 
