@@ -1,9 +1,12 @@
 import logging
 import sys
+from contextlib import asynccontextmanager
 
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from medbox.api.middlewares.logging import RequestLoggingMiddleware
 from medbox.api.routes.router_v1 import router_v1
 from medbox.core.config.settings import settings
 
@@ -12,15 +15,52 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     stream=sys.stdout,
-    force=True,
 )
+
+
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan handler (startup + shutdown)."""
+    logger.info("🚀 API server started")
+    logger.info("APP_URL: %s", settings.app_url)
+    logger.info("URL_PREFIX: %s", settings.url_prefix)
+
+    # Startup: migrations + scheduler
+    logger.info("📦 Running database migrations...")
+    try:
+        from alembic.config import Config
+
+        alembic_cfg = Config("alembic.ini")
+        # command.upgrade(alembic_cfg, "head") #############################################
+        logger.info("✅ Migrations completed successfully")
+    except Exception as e:
+        logger.error("⚠️  Migration error: %s", e, exc_info=True)
+        raise
+
+    logger.info("⏰ Initializing scheduler...")
+    try:
+        from medbox.core.tasks.scheduler import init_scheduler
+
+        init_scheduler()
+        logger.info("✅ Scheduler initialized (daily sync at 2 AM)")
+    except Exception as e:
+        logger.warning("⚠️  Scheduler initialization warning: %s", e, exc_info=True)
+
+    yield
+
+    # Shutdown (si tu as quelque chose à fermer plus tard)
+    logger.info("🛑 API server stopped")
+
 
 # FastAPI root_path must be string, not None
 root_path = settings.url_prefix or ""
 
-app = FastAPI(title="MedBox API", root_path=root_path)
+app = FastAPI(title="MedBox API", root_path=root_path, lifespan=lifespan)
 app.include_router(router_v1)
+app.add_middleware(RequestLoggingMiddleware)
 
 allowed_origins = [
     "https://medbox.theokaszak.fr",
@@ -47,53 +87,52 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add Traefik/Proxy header middleware for real IP logging
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-@app.on_event("startup")
-async def startup_event() -> None:
-    """Initialize database migrations and scheduler on app startup.
-
-    1. Runs pending database migrations via Alembic
-    2. Initializes APScheduler to send Dramatiq tasks at 2 AM daily
-    """
-    logger.info("🚀 API server started")
-    logger.info(f"APP_URL: {settings.app_url}")
-    logger.info(f"URL_PREFIX: {settings.url_prefix}")
-
-    # Run database migrations
-    logger.info("📦 Running database migrations...")
-    try:
-        from alembic import command
-        from alembic.config import Config
-
-        alembic_cfg = Config("alembic.ini")
-        command.upgrade(alembic_cfg, "head")
-        logger.info("✅ Migrations completed successfully")
-    except Exception as e:
-        logger.error(f"⚠️  Migration error: {e}", exc_info=True)
-        raise
-
-    # Initialize scheduler for medication sync
-    logger.info("⏰ Initializing scheduler...")
-    try:
-        from medbox.core.tasks.scheduler import init_scheduler
-
-        init_scheduler()
-        logger.info("✅ Scheduler initialized (daily sync at 2 AM)")
-    except Exception as e:
-        logger.warning(f"⚠️  Scheduler initialization warning: {e}", exc_info=True)
+# TrustedHostMiddleware expects hostnames, not full URLs
+allowed_hosts = [
+    "medbox.theokaszak.fr",
+    "api.medbox.theokaszak.fr",
+    "localhost",
+    "127.0.0.1",
+    "*.localhost",
+]
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=allowed_hosts,
+)
 
 
 def run() -> None:
     """Run production server."""
-    import uvicorn
+    a = logging.getLogger("uvicorn.access")
+    e = logging.getLogger("uvicorn.error")
 
-    uvicorn.run("medbox.api.main:app", host="0.0.0.0", port=8000)  # noqa: S104
+    logger.info(
+        "uvicorn.access level=%s propagate=%s handlers=%s",
+        a.level,
+        a.propagate,
+        a.handlers,
+    )
+    logger.info(
+        "uvicorn.error  level=%s propagate=%s handlers=%s",
+        e.level,
+        e.propagate,
+        e.handlers,
+    )
+
+    uvicorn.run(
+        "medbox.api.main:app",
+        host="0.0.0.0",
+        port=8000,
+        access_log=True,
+        log_level="info",
+    )
 
 
 def run_dev() -> None:
     """Run development server with auto-reload."""
-    import uvicorn
-
     uvicorn.run(
         "medbox.api.main:app",
         host="0.0.0.0",  # noqa: S104
@@ -101,4 +140,10 @@ def run_dev() -> None:
         reload=True,
         reload_dirs=["medbox/api", "medbox/core"],
         reload_excludes=["medbox/schedulerworker"],
+        access_log=True,
+        log_level="debug",
     )
+
+
+if __name__ == "__main__":
+    run()

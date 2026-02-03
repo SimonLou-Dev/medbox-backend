@@ -50,5 +50,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 EXPOSE 8000
 
-# Run API server with unbuffered logging
+# Run API server with unbuffered logging + access logs + proxy headers for Traefik
 CMD ["python", "-u", "-m", "uvicorn", "medbox.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*", "--access-log", "--log-level", "info"]
