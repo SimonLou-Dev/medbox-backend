@@ -186,7 +186,7 @@ class TenantRightService:
             Si non authorisé
 
         """
-        if not self.ensure_user_in_tenant(user_sub, tenant_id):
+        if not await self.ensure_user_in_tenant(user_sub, tenant_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Accès non authorisé en dehors du tenant",

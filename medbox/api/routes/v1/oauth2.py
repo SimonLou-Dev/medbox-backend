@@ -146,7 +146,7 @@ async def logout(
     security: SecuritySvcDep,
     _: CurrentUser,
     id_token_hint: Annotated[str | None, Query()] = None,
-) -> RedirectResponse:
+) -> JSONResponse:
     """Déconnecte l'utilisateur de Keycloak.
 
     Args:
@@ -155,7 +155,7 @@ async def logout(
         id_token_hint: Token ID pour améliorer la déconnexion (optionnel)
 
     Returns:
-        Redirection vers la page de déconnexion Keycloak
+        JSON avec l'URL de déconnexion Keycloak
 
     """
     # Construire l'URL de logout
@@ -169,12 +169,19 @@ async def logout(
     query_string = urllib.parse.urlencode(params)
     logout_url = f"{security.logout_endpoint}?{query_string}"
 
-    # Créer la réponse de redirection
-    response = RedirectResponse(logout_url)
+    # Créer la réponse JSON (pas de redirect, pour que les Set-Cookie
+    # soient correctement traités par le navigateur en cross-origin)
+    response = JSONResponse(content={"logout_url": logout_url})
 
-    # Supprimer les cookies
-    response.delete_cookie("access_token")
-    response.delete_cookie("refresh_token")
+    # Supprimer les cookies avec les mêmes attributs qu'à la création
+    cookie_delete_config = {
+        "httponly": True,
+        "secure": True,
+        "samesite": "none",
+    }
+    response.delete_cookie("access_token", **cookie_delete_config)
+    response.delete_cookie("refresh_token", **cookie_delete_config)
+    response.delete_cookie("csrf_token", secure=True, samesite="none")
 
     return response
 
