@@ -49,7 +49,16 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
                 return JSONResponse(
                     status_code=HTTP_403_FORBIDDEN,
-                    content={"detail": "CSRF blocked (bad origin)"},
+                    content={"detail": "CSRF blocked (token mismatch)"},
                 )
 
-        return await call_next(request)
+        response = await call_next(request)
+
+        # Expose the CSRF token via a response header so that cross-origin
+        # frontends can capture it (document.cookie cannot read cookies set
+        # on a different domain, even without HttpOnly).
+        csrf_cookie = request.cookies.get(self.cookie_name)
+        if csrf_cookie:
+            response.headers["X-CSRF-Token"] = csrf_cookie
+
+        return response
