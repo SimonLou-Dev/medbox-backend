@@ -26,7 +26,6 @@ router = APIRouter(prefix="/tenant", tags=["Tenant"])
 @router.post(
     "/",
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Security(oauth2_scheme)],
 )
 async def create_tenant(
     body: TenantRequest,
@@ -51,7 +50,7 @@ async def create_tenant(
     return await tenant_svc.get(tenant.id)
 
 
-@router.get("/{tenant_id}", dependencies=[Security(oauth2_scheme)])
+@router.get("/{tenant_id}", )
 async def get_tenant(
     tenant_id: UUID,
     tenant_right_svc: TenantRightSvcDep,
@@ -77,7 +76,7 @@ async def get_tenant(
     return TenantResponse.model_validate(tenant)
 
 
-@router.put("/{tenant_id}", dependencies=[Security(oauth2_scheme)])
+@router.put("/{tenant_id}", )
 async def update_tenant(
     tenant_id: UUID,
     body: TenantRequest,
@@ -112,7 +111,6 @@ async def update_tenant(
 @router.delete(
     "/{tenant_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Security(oauth2_scheme)],
 )
 async def delete_tenant(
     tenant_id: UUID,

@@ -1,15 +1,15 @@
 """Router pour l'authentification OAuth2 via Keycloak."""
 
+import secrets
 import urllib.parse
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, HTTPException, Query, Security, status
+from fastapi import APIRouter, Cookie, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from medbox.api.routes import v1
 from medbox.core.config.settings import settings
-from medbox.core.dto.auth import MeResponse, RefreshTokenRequest, TokenResponse
-from medbox.core.services import CurrentUser, SecuritySvcDep, UserSvcDep, oauth2_scheme
+from medbox.core.dto.auth import MeResponse
+from medbox.core.services import CurrentUser, SecuritySvcDep, UserSvcDep
 
 router = APIRouter(prefix="/oauth2", tags=["OAuth2"])
 
@@ -36,7 +36,7 @@ async def login(
     backend_callback = f"{settings.app_url}"
 
     if settings.url_prefix:
-        backend_callback += f"/{settings.url_prefix}"
+        backend_callback += f"{settings.url_prefix}"
     backend_callback += "/v1/oauth2/callback"
 
     # Paramètres de base
@@ -57,13 +57,13 @@ async def login(
     return RedirectResponse(auth_url)
 
 
-@router.get("/callback")
+@router.get("/callback", response_model=MeResponse)
 async def callback(
     code: Annotated[str, Query()],
     security: SecuritySvcDep,
     user_service: UserSvcDep,
     state: Annotated[str | None, Query()] = None,
-) -> JSONResponse:
+) -> MeResponse:
     """Retour OAuth2 après authentification Keycloak.
 
     Échange le code d'autorisation contre des tokens et enregistre l'utilisateur.
@@ -89,13 +89,7 @@ async def callback(
         redirect_url = urllib.parse.unquote_plus(state)
         response = RedirectResponse(redirect_url, status_code=status.HTTP_302_FOUND)
     else:
-        response = JSONResponse(
-            content={
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "token_type": "Bearer",
-            },
-        )
+        response = Response(status_code=status.HTTP_204_NO_CONTENT)
 
     # Configurer les cookies d'authentification
     _set_auth_cookies(response, access_token, refresh_token or "")
@@ -105,12 +99,9 @@ async def callback(
 
 @router.post(
     "/refresh",
-    response_model=TokenResponse,
-    dependencies=[Security(oauth2_scheme)],
 )
 async def refresh_token(
     security: SecuritySvcDep,
-    body: RefreshTokenRequest,
     cookie_refresh: Annotated[str | None, Cookie(alias="refresh_token")] = None,
 ) -> JSONResponse:
     """Rafraîchit l'access token.
@@ -129,36 +120,28 @@ async def refresh_token(
         HTTPException: Si aucun refresh token n'est fourni
 
     """
-    refresh = body.refresh_token or cookie_refresh
-    if not refresh:
+    if not cookie_refresh:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="No refresh token provided",
         )
 
     # Rafraîchir les tokens
-    tokens = await security.refresh_token(refresh)
+    tokens = await security.refresh_token(cookie_refresh)
 
     # Préparer la réponse
-    response = JSONResponse(
-        content={
-            "access_token": tokens.access_token,
-            "refresh_token": tokens.refresh_token,
-            "token_type": tokens.token_type,
-        },
-    )
-
+    resp = Response(status_code=status.HTTP_204_NO_CONTENT)
     # Mettre à jour les cookies
     _set_auth_cookies(
-        response,
+        resp,
         tokens.access_token,
-        tokens.refresh_token or refresh,
+        tokens.refresh_token,
     )
 
-    return response
+    return resp
 
 
-@router.post("/logout", dependencies=[Security(oauth2_scheme)])
+@router.post("/logout")
 async def logout(
     security: SecuritySvcDep,
     _: CurrentUser,
@@ -196,7 +179,7 @@ async def logout(
     return response
 
 
-@router.get("/me", response_model=MeResponse, dependencies=[Security(oauth2_scheme)])
+@router.get("/me", response_model=MeResponse)
 async def get_current_user(
     user: CurrentUser,
     user_service: UserSvcDep,
@@ -209,7 +192,6 @@ async def get_current_user(
         Informations complètes de l'utilisateur
 
     """
-    # Récupérer l'utilisateur depuis la DB
     db_user = await user_service.get_user_from_subject(user.subject)
 
     if not db_user:
@@ -262,4 +244,15 @@ def _set_auth_cookies(
         "refresh_token",
         refresh_token,
         **{**cookie_config, "max_age": 2592000},  # 30 jours pour le refresh token
+    )
+
+    csrf = secrets.token_urlsafe(32)
+    response.set_cookie(
+        "csrf_token",
+        csrf,
+        httponly=False,
+        secure=True,
+        samesite="none",
+        path="/",
+        max_age=2592000,
     )

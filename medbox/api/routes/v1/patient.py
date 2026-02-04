@@ -3,14 +3,13 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Security, status
+from fastapi import APIRouter, Depends, Query, status
 
 from medbox.core.dto.patient import PatientListResponse, PatientRequest, PatientResponse
 from medbox.core.services import (
     CurrentUser,
     TenantRightSvcDep,
     get_user_service,
-    oauth2_scheme,
 )
 from medbox.core.services.patient import PatientService
 from medbox.core.services.user import UserService
@@ -46,7 +45,7 @@ PatientSvcDep = Annotated[PatientService, Depends(get_patient_service)]
 @router.post(
     "/",
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Security(oauth2_scheme)],
+
 )
 async def create_patient(
     body: PatientRequest,
@@ -69,7 +68,7 @@ async def create_patient(
     return await patient_svc.create(body)
 
 
-@router.get("/", dependencies=[Security(oauth2_scheme)])
+@router.get("/")
 async def list_patients(
     user: CurrentUser,
     patient_svc: PatientSvcDep,
@@ -115,7 +114,7 @@ async def list_patients(
     )
 
 
-@router.get("/{patient_id}", dependencies=[Security(oauth2_scheme)])
+@router.get("/{patient_id}")
 async def get_patient(
     patient_id: UUID,
     user: CurrentUser,
@@ -137,7 +136,7 @@ async def get_patient(
     return await patient_svc.get(patient_id)
 
 
-@router.patch("/{patient_id}", dependencies=[Security(oauth2_scheme)])
+@router.patch("/{patient_id}")
 async def update_patient(
     patient_id: UUID,
     body: PatientRequest,
@@ -164,7 +163,7 @@ async def update_patient(
 @router.delete(
     "/{patient_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Security(oauth2_scheme)],
+
 )
 async def delete_patient(
     patient_id: UUID,

@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING, Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 from medbox.api.deps.response import ok_response
@@ -18,7 +18,6 @@ from medbox.core.services import (
     TenantRightSvcDep,
     UserContext,
     UserSvcDep,
-    oauth2_scheme,
 )
 from medbox.core.services.tenant_right import require_tenant_role
 
@@ -33,7 +32,7 @@ admin_router = APIRouter(prefix="/tenant/{tenant_id}/invite", tags=["invitation"
 # ==============================================================================
 
 
-@router.patch("/claim", dependencies=[Security(oauth2_scheme)])
+@router.patch("/claim")
 async def accept_invitation(
     body: ClaimInvitationDTO,
     user: CurrentUser,
@@ -50,7 +49,7 @@ async def accept_invitation(
     raise HTTPException(status_code="400", detail="Vous êtes déja dans un tenant.")
 
 
-@admin_router.patch("/{invitation_id}/revoke", dependencies=[Security(oauth2_scheme)])
+@admin_router.patch("/{invitation_id}/revoke")
 async def revoke_invitation(
     invitation_id: str,
     _: Annotated[
@@ -74,7 +73,7 @@ async def revoke_invitation(
     return ok_response
 
 
-@admin_router.post("/send", dependencies=[Security(oauth2_scheme)])
+@admin_router.post("/send")
 async def send_invitation(
     tenant_id: str,
     target_email: str,
@@ -113,7 +112,7 @@ async def send_invitation(
     return ResponseInvitationWithCodeDTO(code=invitation.code)
 
 
-@admin_router.get("/", dependencies=[Security(oauth2_scheme)])
+@admin_router.get("/")
 async def list_invitations(
     tenant_id: str,
     _: Annotated[

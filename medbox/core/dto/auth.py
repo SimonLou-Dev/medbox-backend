@@ -74,4 +74,4 @@ class MeResponse(BaseModel):
 class RefreshTokenRequest(BaseModel):
     """Requête de rafraîchissement de token."""
 
-    refresh_token: str = Field(..., description="Refresh token à utiliser")
+    refresh_token: str|None = Field(None, description="Refresh token à utiliser")

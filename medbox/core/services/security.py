@@ -8,6 +8,7 @@ from typing import Annotated, Any
 
 import httpx
 from authlib.jose import JsonWebKey, jwt
+from authlib.jose.errors import ExpiredTokenError, JoseError
 from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2AuthorizationCodeBearer
 from fastapi.security.utils import get_authorization_scheme_param
@@ -185,10 +186,23 @@ class SecurityService:
             claims = jwt.decode(token, keys)
             claims.validate()
             return dict(claims)
-        except Exception as e:
+        except ExpiredTokenError as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Invalid or expired token: {e}",
+                detail="token_expired",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from e
+        except JoseError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="token_invalid",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from e
+        except Exception as e:
+            # erreur inattendue => 500 ou 503 selon ton goût, mais pas 401
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="token_decode_error",
             ) from e
 
     # --------------------------------------------------------------------------
@@ -215,7 +229,7 @@ class SecurityService:
             backend_callback = f"{settings.app_url}"
 
             if settings.url_prefix:
-                backend_callback += f"/{settings.url_prefix}"
+                backend_callback += f"{settings.url_prefix}"
             backend_callback += "/v1/oauth2/callback"
             response = await client.post(
                 self.token_endpoint,
@@ -312,8 +326,6 @@ class SecurityService:
     ) -> UserContext:
         """Récupère le contexte de l'utilisateur authentifié.
 
-        Tente un rafraîchissement automatique si le token est expiré.
-
         Args:
             request: La requête HTTP
             response: La réponse HTTP (pour mettre à jour les cookies)
@@ -329,29 +341,13 @@ class SecurityService:
         if not token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated",
+                detail="not_authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
             )
 
-        try:
-            claims = await self.decode_token(token)
-            return UserContext(claims=claims, token=token)
-        except HTTPException:
-            # Tentative de rafraîchissement silencieux
-            refresh_token = request.cookies.get("refresh_token")
-            if not refresh_token:
-                raise
+        claims = await self.decode_token(token)
+        return UserContext(claims=claims, token=token)
 
-            tokens = await self.refresh_token(refresh_token)
-
-            # Mise à jour des cookies
-            self._set_auth_cookies(
-                response,
-                tokens.access_token,
-                tokens.refresh_token or refresh_token,
-            )
-
-            claims = await self.decode_token(tokens.access_token)
-            return UserContext(claims=claims, token=tokens.access_token)
 
     async def get_current_user_optional(
         self,

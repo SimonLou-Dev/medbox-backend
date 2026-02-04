@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from medbox.api.middlewares.logging import RequestLoggingMiddleware
+from medbox.api.middlewares.csrf import CSRFMiddleware
 from medbox.api.routes.router_v1 import router_v1
 from medbox.core.config.settings import settings
 
@@ -60,7 +60,7 @@ root_path = settings.url_prefix or ""
 
 app = FastAPI(title="MedBox API", root_path=root_path, lifespan=lifespan)
 app.include_router(router_v1)
-app.add_middleware(RequestLoggingMiddleware)
+
 
 allowed_origins = [
     "https://medbox.theokaszak.fr",
@@ -86,6 +86,8 @@ app.add_middleware(
     # Headers autorisés (Authorization utile pour JWT)
     allow_headers=["*"],
 )
+
+app.add_middleware(CSRFMiddleware, allowed_origins=set(allowed_origins))
 
 # Add Traefik/Proxy header middleware for real IP logging
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
