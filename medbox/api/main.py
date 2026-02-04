@@ -75,24 +75,20 @@ allowed_origins = [
     "http://localhost:5174",
 ]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    # Si tu utilises des cookies (session, auth), mets True.
-    # Sinon laisse False pour éviter d'ouvrir inutilement.
-    allow_credentials=True,
-    # Méthodes autorisées
-    allow_methods=["*"],
-    # Headers autorisés (Authorization utile pour JWT)
-    allow_headers=["*"],
-)
+# ---------------------------------------------------------------------------
+# Middlewares
+# ---------------------------------------------------------------------------
+# Starlette's add_middleware() inserts each new middleware at position 0,
+# so the LAST one added becomes the OUTERMOST layer.
+# Desired execution order (outermost → innermost):
+#   CORSMiddleware → CSRFMiddleware → TrustedHostMiddleware → Route
+#
+# This ensures CORS headers are present on ALL responses, including
+# 403s returned by the CSRF middleware.
+# ---------------------------------------------------------------------------
 
-app.add_middleware(CSRFMiddleware, allowed_origins=set(allowed_origins))
-
-# Add Traefik/Proxy header middleware for real IP logging
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-# TrustedHostMiddleware expects hostnames, not full URLs
 allowed_hosts = [
     "medbox.theokaszak.fr",
     "api.medbox.theokaszak.fr",
@@ -100,9 +96,24 @@ allowed_hosts = [
     "127.0.0.1",
     "*.localhost",
 ]
+
+# 1. TrustedHostMiddleware (innermost)
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=allowed_hosts,
+)
+
+# 2. CSRFMiddleware
+app.add_middleware(CSRFMiddleware, allowed_origins=set(allowed_origins))
+
+# 3. CORSMiddleware (outermost — added last)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-CSRF-Token"],
 )
 
 
