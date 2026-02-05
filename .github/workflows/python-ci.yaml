@@ -213,6 +213,7 @@ jobs:
           severity: 'HIGH,CRITICAL'
           format: sarif
           output: trivy-dockerfile-report.sarif
+          skip-dirs: '.devcontainer'
 
       - name: Upload Trivy Dockerfile report artifact
         if: always()

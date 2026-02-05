@@ -8,13 +8,15 @@ packages = [{ include = "medbox" }]
 [tool.poetry.dependencies]
 python = "^3.11"
 
+requests="2.32.5"
+
 # Core API
-fastapi = "0.110.0"
+fastapi = "0.128.1"
 uvicorn = { version = "0.29.0", extras = ["standard"] }
 
 # Auth / Keycloak
-python-jose = "3.3.0"
-authlib = "1.3.0"
+python-jose = "3.5.0"
+authlib = "1.6.6"
 python-keycloak = "2.9.0"
 
 # ORM / Database
@@ -28,22 +30,24 @@ pydantic = {extras = ["email"], version = "^2.12.4"}
 pydantic-settings = "2.2.1"
 
 # Security / Crypto
-cryptography = "42.0.5"
+cryptography = "44.0.1"
 passlib = { version = "1.7.4", extras = ["bcrypt"] }
 
 # Logging
 structlog = "24.1.0"
 
 # Async Utils
-aiohttp = "3.9.1"
+aiohttp = "3.13.3"
 httpx = "0.27.0"
 redis = "5.0.1"
 tenacity = "8.2.3"
+
 
 # Task Queue
 dramatiq = "2.0.1"
 apscheduler = "^3.10.4"
 dramatiq-crontab = "^1.0.12"
+jaraco-context = "^6.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
@@ -51,6 +55,7 @@ pytest-asyncio = "^1.3.0"
 httpx = "^0.27"
 ruff = "^0.6"
 aiosqlite = "^0.22.0"
+wheel="^0.46.2"
 
 [tool.poetry.scripts]
 api = "medbox.api.main:run"

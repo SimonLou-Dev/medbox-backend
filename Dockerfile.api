@@ -16,7 +16,7 @@ COPY pyproject.toml poetry.lock* ./
 # Export dependencies and install
 RUN pip install poetry==1.7.1 && \
     python -m venv /opt/venv && \
-    /opt/venv/bin/pip install --upgrade pip setuptools && \
+    /opt/venv/bin/pip install --upgrade pip>=25.3 setuptools && \
     poetry export -f requirements.txt --only main | /opt/venv/bin/pip install -r /dev/stdin && \
     pip uninstall -y poetry
 
