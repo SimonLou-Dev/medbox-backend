@@ -27,7 +27,7 @@ class User(Base, IDMixin, TimestampMixin):
         nullable=True,
     )
 
-    keycloak_subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    keycloak_subject: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     c_full_name: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
 
