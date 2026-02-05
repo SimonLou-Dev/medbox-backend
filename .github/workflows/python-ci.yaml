@@ -120,7 +120,7 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             <!-- ci-tests -->
-            ${{ steps.pytest.outcome == 'success' && '✅ **Tests** — 28 passed' || '❌ **Tests échoués** — voir les annotations et l\'artefact `test-results`.' }}
+            ${{ steps.pytest.outcome == 'success' && '✅ **Tests** — 28 passed' }}
           edit-reason: seed
 
       - name: Fail if tests failed
