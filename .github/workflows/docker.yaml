@@ -1,18 +1,6 @@
 name: Build and Push Docker Images
 
 on:
-  push:
-    branches:
-      - prod
-      - dev
-      - testing
-    tags:
-      - 'v*'
-  pull_request:
-    branches:
-      - prod
-      - dev
-      - testing
   workflow_call:
 
 env:

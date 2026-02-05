@@ -1,4 +1,4 @@
-name: CI - Build Docker Images
+name: MEDBOX BACKEND CI
 on:
   push:
     branches: ['prod', 'dev', 'testing']
