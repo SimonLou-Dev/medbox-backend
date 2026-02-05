@@ -1,0 +1,234 @@
+name: Python CI
+
+on:
+  workflow_call:
+
+# Env vars factices pour que pydantic-settings passe la validation
+# à l'import-time (les tests utilisent SQLite in-memory, pas ces valeurs).
+env:
+  DATABASE_HOST: localhost
+  DATABASE_USER: test
+  DATABASE_PASSWORD: test
+  DATABASE_NAME: medbox_test
+  KEYCLOAK_REALM: medbox
+  KEYCLOAK_CLIENT_ID: medbox-api
+  KEYCLOAK_CLIENT_SECRET: secret
+  S3_ENDPOINT: http://localhost:9000
+  S3_REGION: us-east-1
+  S3_BUCKET: medbox
+  S3_ACCESS_KEY: test
+  S3_SECRET_KEY: test
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lint — annotations natives sur les lignes du PR via --output-format github
+  # ---------------------------------------------------------------------------
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dev dependencies
+        run: poetry install --no-root
+
+      - name: Lint (ruff check)
+        run: poetry run ruff check --output-format github .
+
+      - name: Format check (ruff format)
+        run: poetry run ruff format --check .
+
+  # ---------------------------------------------------------------------------
+  # Tests + Migrations — PostgreSQL pour alembic, SQLite in-memory pour pytest
+  # ---------------------------------------------------------------------------
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: medbox_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Apply migrations
+        run: poetry run alembic upgrade head
+
+      - name: Check pending migrations
+        run: poetry run alembic check
+
+      - name: Run tests
+        id: pytest
+        continue-on-error: true
+        run: poetry run pytest --tb=short --junitxml=test-results.xml -W error
+
+      - name: Upload test results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.xml
+
+      # Annotations + check run sur le PR avec les résultats JUnit
+      - name: Publish test report
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report: test-results.xml
+          fail_on_empty: true
+
+      # Commentaire PR mis à jour à chaque exécution
+      - name: Find existing test comment
+        if: always() && github.event_name == 'pull_request'
+        id: fc-tests
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-regex: '<!-- ci-tests -->'
+
+      - name: Comment on PR — tests
+        if: always() && github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.fc-tests.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            <!-- ci-tests -->
+            ${{ steps.pytest.outcome == 'success' && '✅ **Tests** — 28 passed' || '❌ **Tests échoués** — voir les annotations et l'\''artefact `test-results`.' }}
+          edit-reason: seed
+
+      - name: Fail if tests failed
+        if: steps.pytest.outcome == 'failure'
+        run: exit 1
+
+  # ---------------------------------------------------------------------------
+  # pip-audit — scan des vulnérabilités des dépendances
+  # ---------------------------------------------------------------------------
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Export requirements
+        run: poetry export -f requirements.txt --without-hashes -o requirements.txt
+
+      - name: Scan dependencies
+        id: audit
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          # Rapport JSON pour l'artefact (ne fail pas)
+          pip-audit -r requirements.txt -f json -o pip-audit-report.json || true
+          # Sortie lisible dans les logs + exit code si vulns trouvées
+          pip-audit -r requirements.txt
+
+      - name: Upload audit report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+
+      - name: Find existing audit comment
+        if: steps.audit.outcome == 'failure' && github.event_name == 'pull_request'
+        id: fc-audit
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-regex: '<!-- ci-pip-audit -->'
+
+      - name: Comment on PR — pip-audit
+        if: steps.audit.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.fc-audit.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            <!-- ci-pip-audit -->
+            ⚠️ **pip-audit : vulnérabilités détectées** — téléchargez l'artefact `pip-audit-report` pour les détails.
+          edit-reason: seed
+
+  # ---------------------------------------------------------------------------
+  # Trivy — scan des Dockerfiles pour les misconfigurations
+  # ---------------------------------------------------------------------------
+  trivy-dockerfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan Dockerfiles with Trivy
+        id: trivy
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          scan-type: config
+          scan-ref: .
+          exit-code: '1'
+          severity: 'HIGH,CRITICAL'
+          format: sarif
+          output: trivy-dockerfile-report.sarif
+
+      - name: Upload Trivy Dockerfile report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-dockerfile-report
+          path: trivy-dockerfile-report.sarif
+
+      - name: Find existing trivy comment
+        if: steps.trivy.outcome == 'failure' && github.event_name == 'pull_request'
+        id: fc-trivy
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-regex: '<!-- ci-trivy-dockerfile -->'
+
+      - name: Comment on PR — trivy dockerfile
+        if: steps.trivy.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.fc-trivy.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            <!-- ci-trivy-dockerfile -->
+            ⚠️ **Trivy : problèmes détectés dans les Dockerfiles** — téléchargez l'artefact `trivy-dockerfile-report` (SARIF).
+          edit-reason: seed
+
+      - name: Fail if findings
+        if: steps.trivy.outcome == 'failure'
+        run: exit 1

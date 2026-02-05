@@ -4,7 +4,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.constants.enums import UserRoles, UserStatus
@@ -21,13 +21,16 @@ class User(Base, IDMixin, TimestampMixin):
     """Utilisateur logique Medbox (lié à Keycloak via subject_id)."""
 
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("keycloak_subject", "tenant_id", name="uq_users_subject_tenant"),
+    )
 
     tenant_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=True,
     )
 
-    keycloak_subject: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    keycloak_subject: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     c_full_name: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
 

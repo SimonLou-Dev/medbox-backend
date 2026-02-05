@@ -268,11 +268,11 @@ class PatientRepository(BaseRepository[Patient]):
 
         """
         async with async_session_local() as session:
-            session.add(patient)
+            merged = await session.merge(patient)
             try:
                 await session.commit()
             except IntegrityError as exc:
                 await session.rollback()
                 raise HTTPException(400, "Update failed: constraint violation") from exc
-            await session.refresh(patient)
-            return patient
+            await session.refresh(merged)
+            return merged

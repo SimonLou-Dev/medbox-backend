@@ -137,7 +137,7 @@ class GlobalMedicationService:
         # Try local database first
         medication = await self.repo.get_by_cis(cis)
         if medication:
-            return GlobalMedicationResponse.from_orm(medication)
+            return GlobalMedicationResponse.model_validate(medication)
 
         # Fallback to external API
         api_data = await self._fetch_from_external_api(f"api/medications/{cis}")
@@ -145,7 +145,7 @@ class GlobalMedicationService:
             # Try to save to database for future use
             saved_med = await self._save_to_database(api_data)
             if saved_med:
-                return GlobalMedicationResponse.from_orm(saved_med)
+                return GlobalMedicationResponse.model_validate(saved_med)
             # Return from API data even if save failed
             return GlobalMedicationResponse.model_validate(api_data)
 
@@ -177,7 +177,7 @@ class GlobalMedicationService:
         if medications and total > 0:
             return GlobalMedicationListResponse(
                 medications=[
-                    GlobalMedicationResponse.from_orm(med) for med in medications
+                    GlobalMedicationResponse.model_validate(med) for med in medications
                 ],
                 total=total,
             )
@@ -224,7 +224,7 @@ class GlobalMedicationService:
         if medications or total > 0:
             return GlobalMedicationListResponse(
                 medications=[
-                    GlobalMedicationResponse.from_orm(med) for med in medications
+                    GlobalMedicationResponse.model_validate(med) for med in medications
                 ],
                 total=total,
             )

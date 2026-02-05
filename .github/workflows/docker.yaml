@@ -3,15 +3,16 @@ name: Build and Push Docker Images
 on:
   push:
     branches:
-      - main
-      - develop
-      - staging
+      - prod
+      - dev
+      - testing
     tags:
       - 'v*'
   pull_request:
     branches:
-      - main
-      - develop
+      - prod
+      - dev
+      - testing
   workflow_call:
 
 env:
@@ -59,29 +60,70 @@ jobs:
             BRANCH_TAG=${GITHUB_REF#refs/tags/}
           else
             BRANCH_TAG=${GITHUB_REF#refs/heads/}
+            # Sanitize: replace / with - for valid Docker tag
+            BRANCH_TAG=$(echo "${BRANCH_TAG}" | tr '/' '-')
           fi
 
           # Lowercase repo name (required by docker/ghcr)
           REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME="${{ env.REGISTRY }}/${REPO_LC}-${{ matrix.service }}"
 
           echo "commit_sha=${COMMIT_SHA}" >> $GITHUB_OUTPUT
           echo "branch_tag=${BRANCH_TAG}" >> $GITHUB_OUTPUT
-          echo "image_name=${{ env.REGISTRY }}/${REPO_LC}-${{ matrix.service }}" >> $GITHUB_OUTPUT
+          echo "image_name=${IMAGE_NAME}" >> $GITHUB_OUTPUT
+
+          # Tags: SHA + branch always, latest only on prod
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE_NAME}:${COMMIT_SHA}"
+            echo "${IMAGE_NAME}:${BRANCH_TAG}"
+            if [[ "${{ github.ref }}" == "refs/heads/prod" ]]; then
+              echo "${IMAGE_NAME}:latest"
+            fi
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
+        id: docker_build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile.${{ matrix.service }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: |
-            ${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.commit_sha }}
-            ${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.branch_tag }}
-            ${{ steps.meta.outputs.image_name }}:latest
+          load: ${{ github.event_name == 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+      - name: Pull image for scanning (push events only)
+        if: github.event_name != 'pull_request'
+        run: docker pull ${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.commit_sha }}
+
+      - name: Scan Docker image with Trivy
+        id: trivy-image
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          scan-type: image
+          image-ref: ${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.commit_sha }}
+          exit-code: '1'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-image-${{ matrix.service }}.sarif
+
+      - name: Upload Trivy image scan artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-image-${{ matrix.service }}
+          path: trivy-image-${{ matrix.service }}.sarif
+
+      - name: Fail if trivy found vulnerabilities
+        if: steps.trivy-image.outcome == 'failure'
+        run: exit 1
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
