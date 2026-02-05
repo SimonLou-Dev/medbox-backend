@@ -108,7 +108,7 @@ class TenantInvitationService:
             Si l'objet n'existe pas ou déja dans un tenant, ou déja  une invité"
 
         """
-        if await self.user_repo.exists(email=target_mail):
+        if await self.user_repo.exists({"email": target_mail}):
             raise HTTPException(
                 status_code=400,
                 detail="L'utilisateur avec cette addresse mail existe déja",
@@ -262,7 +262,7 @@ class TenantInvitationService:
         """
         while True:
             code: str = "".join(secrets.choice(string.digits) for _ in range(6))
-            if not (code := await self.invite_repo.exists({"code": code})):
+            if not await self.invite_repo.exists({"code": code}):
                 return code
 
     async def get_paginated_invitations(

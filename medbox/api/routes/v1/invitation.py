@@ -134,4 +134,5 @@ async def list_invitations(
         list[ResponseInvitationDTO]: Liste des invitations du tenant
 
     """
-    await tenant_invite_svc.get_paginated_invitations(tenant_id=tenant_id)
+    result = await tenant_invite_svc.get_paginated_invitations(tenant_id=tenant_id)
+    return result.items
