@@ -51,8 +51,9 @@ class Invitation(Base, IDMixin, TimestampMixin):
         default=InviteStatus.PENDING,
     )
 
-    sended_by_user_id: Mapped[uuid.UUID] = mapped_column(
+    sended_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         doc="User qui a envoyé cette invitation, si applicable",
     )
 
@@ -66,6 +67,6 @@ class Invitation(Base, IDMixin, TimestampMixin):
     claimed_by_user: Mapped["User | None"] = relationship(
         foreign_keys=[claimed_by_user_id],
     )
-    sended_by_user: Mapped["User"] = relationship(
+    sended_by_user: Mapped["User | None"] = relationship(
         foreign_keys=[sended_by_user_id],
     )
