@@ -6,4 +6,4 @@ from medbox.schedulerworker import broker_config  # noqa: F401
 
 
 def run():
-    print("Scheduler worker started")
+    print("Scheduler worker started")  # noqa: T201

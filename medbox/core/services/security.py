@@ -348,7 +348,6 @@ class SecurityService:
         claims = await self.decode_token(token)
         return UserContext(claims=claims, token=token)
 
-
     async def get_current_user_optional(
         self,
         request: Request,

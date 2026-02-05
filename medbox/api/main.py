@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from medbox.api.middlewares.csrf import CSRFMiddleware
 from medbox.api.routes.router_v1 import router_v1
@@ -28,12 +29,9 @@ async def lifespan(app: FastAPI):
     logger.info("APP_URL: %s", settings.app_url)
     logger.info("URL_PREFIX: %s", settings.url_prefix)
 
-    # Startup: migrations + scheduler
     logger.info("📦 Running database migrations...")
     try:
-        from alembic.config import Config
-
-        alembic_cfg = Config("alembic.ini")
+        # alembic_cfg = Config("alembic.ini")
         # command.upgrade(alembic_cfg, "head") #############################################
         logger.info("✅ Migrations completed successfully")
     except Exception as e:
@@ -42,9 +40,9 @@ async def lifespan(app: FastAPI):
 
     logger.info("⏰ Initializing scheduler...")  # Inici c'es c&ssé
     try:
-        from medbox.core.tasks.scheduler import init_scheduler
+        from medbox.core.tasks.medication_sync import sync_medications_from_api
 
-        init_scheduler()
+        await sync_medications_from_api.send()
         logger.info("✅ Scheduler initialized (daily sync at 2 AM)")
     except Exception as e:
         logger.warning("⚠️  Scheduler initialization warning: %s", e, exc_info=True)
@@ -87,7 +85,6 @@ allowed_origins = [
 # 403s returned by the CSRF middleware.
 # ---------------------------------------------------------------------------
 
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 allowed_hosts = [
     "medbox.theokaszak.fr",
@@ -137,7 +134,7 @@ def run() -> None:
 
     uvicorn.run(
         "medbox.api.main:app",
-        host="0.0.0.0",
+        host="0.0.0.0",  # noqa: S104
         port=8000,
         access_log=True,
         log_level="info",

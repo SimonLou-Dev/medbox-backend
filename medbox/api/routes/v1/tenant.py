@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Security, status
+from fastapi import APIRouter, Depends, status
 
 from medbox.core.constants.enums import UserRoles
 from medbox.core.dto.tenant import TenantRequest, TenantResponse
@@ -12,7 +12,6 @@ from medbox.core.services import (
     TenantRightSvcDep,
     TenantSvcDep,
     UserContext,
-    oauth2_scheme,
 )
 from medbox.core.services.tenant_right import require_tenant_role
 
@@ -50,7 +49,9 @@ async def create_tenant(
     return await tenant_svc.get(tenant.id)
 
 
-@router.get("/{tenant_id}", )
+@router.get(
+    "/{tenant_id}",
+)
 async def get_tenant(
     tenant_id: UUID,
     tenant_right_svc: TenantRightSvcDep,
@@ -76,7 +77,9 @@ async def get_tenant(
     return TenantResponse.model_validate(tenant)
 
 
-@router.put("/{tenant_id}", )
+@router.put(
+    "/{tenant_id}",
+)
 async def update_tenant(
     tenant_id: UUID,
     body: TenantRequest,

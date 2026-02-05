@@ -172,13 +172,10 @@ async def _save_medications(medications_data: list) -> tuple[int, int, int, int]
             # Parse dateAMM from DD/MM/YYYY format
             date_amm = None
             if med_data.get("dateAMM"):
-                try:
-                    date_amm = datetime.strptime(
-                        med_data.get("dateAMM"),
-                        "%d/%m/%Y",
-                    ).date()
-                except (ValueError, TypeError):
-                    pass
+                date_amm = datetime.strptime(
+                    med_data.get("dateAMM"),
+                    "%d/%m/%Y",
+                ).date()
 
             medication = GlobalMedication(
                 cis=cis,

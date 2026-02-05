@@ -22,7 +22,9 @@ class User(Base, IDMixin, TimestampMixin):
 
     __tablename__ = "users"
     __table_args__ = (
-        UniqueConstraint("keycloak_subject", "tenant_id", name="uq_users_subject_tenant"),
+        UniqueConstraint(
+            "keycloak_subject", "tenant_id", name="uq_users_subject_tenant"
+        ),
     )
 
     tenant_id: Mapped[uuid.UUID | None] = mapped_column(

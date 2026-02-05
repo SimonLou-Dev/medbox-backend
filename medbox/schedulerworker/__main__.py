@@ -4,8 +4,8 @@ import subprocess
 
 
 def run():
-    subprocess.run(
-        ["dramatiq", "medbox.schedulerworker.main"],
+    subprocess.run(  # noqa: S603
+        ["dramatiq", "medbox.schedulerworker.main"],  # noqa: S607
         check=True,
     )
 

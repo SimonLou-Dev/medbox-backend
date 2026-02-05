@@ -45,7 +45,6 @@ PatientSvcDep = Annotated[PatientService, Depends(get_patient_service)]
 @router.post(
     "/",
     status_code=status.HTTP_201_CREATED,
-
 )
 async def create_patient(
     body: PatientRequest,
@@ -163,7 +162,6 @@ async def update_patient(
 @router.delete(
     "/{patient_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-
 )
 async def delete_patient(
     patient_id: UUID,

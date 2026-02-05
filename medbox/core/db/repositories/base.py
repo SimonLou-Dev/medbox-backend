@@ -23,8 +23,8 @@ class Page(Generic[ModelType]):
 
     items: Sequence[ModelType]  # Contenu de la page
     page: int  # Page courante
-    per_page: int  # Taille d’une page
-    total: int  # Nombre total d’éléments
+    per_page: int  # Taille d une page
+    total: int  # Nombre total d éléments
     total_pages: int  # Nombre total de pages
 
 
@@ -394,7 +394,7 @@ class BaseRepository(Generic[ModelType]):
             result = await session.execute(stmt_paginated)
             items = result.scalars().all()
 
-            # Compter le total d’éléments correspondant aux filtres
+            # Compter le total d éléments correspondant aux filtres
             count_stmt = select(func.count()).select_from(self.model)
 
             if filters:

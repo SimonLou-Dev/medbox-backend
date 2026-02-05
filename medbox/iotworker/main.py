@@ -1,1 +1,1 @@
-from medbox.iotworker.tasks import *
+from medbox.iotworker.tasks import *  # noqa: F403
