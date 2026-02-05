@@ -104,7 +104,7 @@ jobs:
       - name: Scan Docker image with Trivy
         id: trivy-image
         continue-on-error: true
-        uses: aquasecurity/trivy-action@v0.20.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: image
           image-ref: ${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.commit_sha }}
