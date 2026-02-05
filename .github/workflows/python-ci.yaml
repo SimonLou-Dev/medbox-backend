@@ -18,6 +18,8 @@ env:
   S3_BUCKET: medbox
   S3_ACCESS_KEY: test
   S3_SECRET_KEY: test
+  POETRY_VIRTUALENVS_IN_PROJECT: "true"
+  POETRY_VIRTUALENVS_PATH: "" 
 
 jobs:
   # ---------------------------------------------------------------------------
