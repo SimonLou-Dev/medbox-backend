@@ -73,11 +73,19 @@ class TenantService:
 
         Returns
         -------
-        Tenant
-            Tenant demandé
+        bool
+            True si supprimé
+
+        Raises
+        ------
+        HTTPException :
+            Si le tenant n'existe pas.
 
         """
         tenant = await self.tenant_repo.get(m_id, ["users"])
+        if tenant is None:
+            raise HTTPException(status_code=404, detail="Tenant introuvable")
+
         for user in tenant.users:
             await self.user_repo.update(
                 user.id,
