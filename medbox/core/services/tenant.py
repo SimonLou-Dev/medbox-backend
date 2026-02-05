@@ -3,6 +3,8 @@
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from fastapi import HTTPException
+
 from medbox.core.constants.enums import UserRoles, UserStatus
 from medbox.core.db.models.tenant import Tenant
 from medbox.core.db.models.user import User
@@ -90,20 +92,32 @@ class TenantService:
         return True
 
     async def create(self, body: TenantRequest, usr_ctx: UserContext) -> (Tenant, User):
-        """List les tenants existants.
+        """Crée un nouveau tenant.
 
         Returns
         -------
         Tenant
-            Tenant demandé
+            Tenant créé
         User
             Administrateur du tenant
 
-        """
-        tenant = Tenant(name=body.name)
+        Raises
+        ------
+        HTTPException :
+            Si l'utilisateur appartient déjà à un tenant.
 
-        tenant = await self.tenant_repo.add(tenant)
+        """
+        # Vérifier que l'utilisateur n'appartient pas déjà à un tenant
         user = await self.user_repo.get_by_subject_or_fail(usr_ctx.subject)
+        if user.tenant_id is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="Vous appartenez déjà à un établissement.",
+            )
+
+        tenant = Tenant(name=body.name)
+        tenant = await self.tenant_repo.add(tenant)
+
         user = await self.tenant_invit_svc.add_user_to_tenant(user.id, tenant.id)
         user = await self.tenant_right_svc.set_user_role(
             user.id,
