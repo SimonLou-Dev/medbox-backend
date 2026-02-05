@@ -108,11 +108,12 @@ class TenantInvitationService:
             Si l'objet n'existe pas ou déja dans un tenant, ou déja  une invité"
 
         """
-        if await self.user_repo.exists({"email": target_mail}):
-            raise HTTPException(
-                status_code=400,
-                detail="L'utilisateur avec cette addresse mail existe déja",
-            )
+        # NOTE: Check désactivé pour permettre d'inviter des utilisateurs existants
+        # if await self.user_repo.exists({"email": target_mail}):
+        #     raise HTTPException(
+        #         status_code=400,
+        #         detail="L'utilisateur avec cette addresse mail existe déja",
+        #     )
 
         if await self.invite_repo.get_valid_by_email(target_mail):
             raise HTTPException(
