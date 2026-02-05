@@ -3,11 +3,11 @@
 from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from medbox.core.db.models.tenant import Tenant
 from medbox.core.dto.patient import PatientRequest
-from medbox.core.exceptions.not_found import ModelNotFoundError
 from medbox.core.services.patient import PatientService
 
 pytestmark = pytest.mark.asyncio
@@ -118,7 +118,7 @@ class TestPatientServiceIntegration:
         await service.delete(patient_id)
 
         # Verify deleted
-        with pytest.raises(ModelNotFoundError):
+        with pytest.raises(HTTPException):
             await service.get(patient_id)
 
     async def test_list_paginated(self, db_session: AsyncSession) -> None:
@@ -141,7 +141,7 @@ class TestPatientServiceIntegration:
         # Get first page
         result = await service.list_paginated(page=1, per_page=10)
 
-        assert result.total == 25
+        assert result.pagination.total == 25
         assert len(result.data) == 10
 
     async def test_list_paginated_with_search(
@@ -164,7 +164,7 @@ class TestPatientServiceIntegration:
         # Search for Smith
         result = await service.list_paginated(page=1, per_page=10, search="Smith")
 
-        assert result.total == 2
+        assert result.pagination.total == 2
         assert len(result.data) == 2
 
     async def test_tenant_isolation(self, db_session: AsyncSession) -> None:

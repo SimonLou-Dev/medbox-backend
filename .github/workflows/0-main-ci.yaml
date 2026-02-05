@@ -1,10 +1,17 @@
-name: Node.js prod CI
+name: CI - Build Docker Images
 on:
   push:
     branches: ['prod', 'dev', 'testing']
   pull_request:
     branches: ['prod', 'dev', 'testing']
 jobs:
+  python-ci:
+    permissions:
+      contents: read
+      checks: write     # pour mikepenz/action-junit-report
+      issues: write     # pour les commentaires PR
+    uses: ./.github/workflows/python-ci.yaml
+
   docker:
     permissions:
       contents: read
