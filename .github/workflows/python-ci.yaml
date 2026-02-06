@@ -106,8 +106,8 @@ jobs:
         if: always()
         uses: mikepenz/action-junit-report@v4
         with:
-          report: test-results.xml
-          fail_on_empty: true
+          report_paths: test-results.xml
+          require_tests: true
 
       # Commentaire PR mis à jour à chaque exécution
       - name: Find existing test comment
