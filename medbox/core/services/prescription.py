@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
@@ -75,6 +76,7 @@ class PrescriptionService:
         HTTPException
             404 if patient not found in tenant
             400 if validation fails
+
         """
         # Validate patient exists in tenant
         patient = await self.patient_repo.get(data.patient_id)
@@ -145,6 +147,7 @@ class PrescriptionService:
         ------
         HTTPException
             404 if not found or not in tenant
+
         """
         prescription = await self.prescription_repo.get(
             prescription_id,
@@ -182,6 +185,7 @@ class PrescriptionService:
         -------
         dict
             Paginated response with items, total, page, per_page
+
         """
         # Validate patient exists
         patient = await self.patient_repo.get(patient_id)
@@ -234,6 +238,7 @@ class PrescriptionService:
         HTTPException
             404 if not found
             400 if validation fails
+
         """
         # Load existing prescription
         prescription = await self._validate_prescription_in_tenant(prescription_id)
@@ -304,6 +309,7 @@ class PrescriptionService:
         -------
         PrescriptionResponse
             Updated prescription
+
         """
         prescription = await self._validate_prescription_in_tenant(prescription_id)
         prescription.status = status_data.status
@@ -340,6 +346,7 @@ class PrescriptionService:
         ------
         HTTPException
             404 if not found
+
         """
         prescription = await self._validate_prescription_in_tenant(prescription_id)
 
@@ -348,8 +355,10 @@ class PrescriptionService:
             try:
                 await self.s3_client.delete_file(prescription.document_s3_key)
             except Exception:
-                # Log but don't fail deletion if S3 delete fails
-                pass
+                logging.exception(
+                    "Failed to delete document from S3 for prescription %s",
+                    prescription_id,
+                )
 
         await self.prescription_repo.delete(prescription_id)
         return True
@@ -374,6 +383,7 @@ class PrescriptionService:
         -------
         PrescriptionResponse
             Updated prescription with new item
+
         """
         # Load prescription with items
         prescription = await self._validate_prescription_in_tenant(
@@ -437,6 +447,7 @@ class PrescriptionService:
         ------
         HTTPException
             404 if item not found
+
         """
         # Load prescription with items
         prescription = await self._validate_prescription_in_tenant(
@@ -499,6 +510,7 @@ class PrescriptionService:
         HTTPException
             400 if trying to delete last item
             404 if item not found
+
         """
         # Load prescription with items
         prescription = await self._validate_prescription_in_tenant(
@@ -562,6 +574,7 @@ class PrescriptionService:
         ------
         HTTPException
             404 if not found
+
         """
         prescription = await self._validate_prescription_in_tenant(
             prescription_id,
@@ -603,6 +616,7 @@ class PrescriptionService:
         HTTPException
             400 if file validation fails
             404 if prescription not found
+
         """
         prescription = await self._validate_prescription_in_tenant(prescription_id)
 
@@ -628,8 +642,10 @@ class PrescriptionService:
             try:
                 await self.s3_client.delete_file(prescription.document_s3_key)
             except Exception:
-                # Log but continue
-                pass
+                logging.exception(
+                    "Failed to delete document from S3 for prescription %s",
+                    prescription_id,
+                )
 
         # Build S3 key
         extension = Path(file.filename or "ordonnance.pdf").suffix.lstrip(".")
@@ -686,6 +702,7 @@ class PrescriptionService:
         ------
         HTTPException
             404 if prescription or document not found
+
         """
         prescription = await self._validate_prescription_in_tenant(prescription_id)
 
@@ -718,6 +735,7 @@ class PrescriptionService:
         ------
         HTTPException
             404 if prescription or document not found
+
         """
         prescription = await self._validate_prescription_in_tenant(prescription_id)
 
@@ -767,6 +785,7 @@ class PrescriptionService:
         ------
         HTTPException
             404 if not found or not in tenant
+
         """
         prescription = await self.prescription_repo.get(
             prescription_id,

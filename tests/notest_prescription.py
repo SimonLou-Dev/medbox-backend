@@ -1,7 +1,6 @@
 """Integration tests for PrescriptionService with real database."""
 
-from datetime import UTC, datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -201,7 +200,11 @@ class TestPrescriptionServiceIntegration:
             await service.create(request)
 
         # List prescriptions
-        result = await service.list_by_patient(patient_id=patient.id, page=1, per_page=20)
+        result = await service.list_by_patient(
+            patient_id=patient.id,
+            page=1,
+            per_page=20,
+        )
 
         assert result["pagination"]["total"] == 3
         assert len(result["data"]) == 3
@@ -228,7 +231,7 @@ class TestPrescriptionServiceIntegration:
         service = PrescriptionService(tenant_id=tenant.id)
 
         # Create 2 active, 1 paused
-        for i in range(2):
+        for _ in range(2):
             request = PrescriptionRequest(
                 patient_id=patient.id,
                 status="active",
@@ -818,7 +821,9 @@ class TestPrescriptionDocumentHandling:
         # Mock S3
         mock_s3 = AsyncMock()
         mock_s3.upload_file.return_value = "test-s3-key"
-        mock_s3.generate_presigned_url.return_value = "https://s3.example.com/presigned-url"
+        mock_s3.generate_presigned_url.return_value = (
+            "https://s3.example.com/presigned-url"
+        )
 
         service = PrescriptionService(tenant_id=tenant.id, s3_client=mock_s3)
 
