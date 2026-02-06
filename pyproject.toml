@@ -48,6 +48,8 @@ dramatiq = "2.0.1"
 apscheduler = "^3.10.4"
 dramatiq-crontab = "^1.0.12"
 jaraco-context = "^6.1.0"
+aioboto3 = "^15.5.0"
+python-multipart = "^0.0.22"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
