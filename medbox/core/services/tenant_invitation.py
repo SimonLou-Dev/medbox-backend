@@ -133,7 +133,7 @@ class TenantInvitationService:
 
         invite = await self.invite_repo.add(invite)
 
-        await expire_invitation.send_with_options(
+        expire_invitation.send_with_options(
             args=[str(invite.id)],
             delay=3600 * 1000,  # Dramatiq prend les ms
         )
