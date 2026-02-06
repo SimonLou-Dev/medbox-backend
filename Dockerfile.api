@@ -14,7 +14,8 @@ RUN apk add --no-cache gcc musl-dev libffi-dev openssl-dev
 COPY pyproject.toml poetry.lock* ./
 
 # Export dependencies and install
-RUN pip install poetry==1.7.1 && \
+RUN pip install --upgrade pip>=26 && \
+    pip install poetry==1.7.1 && \
     python -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip>=26 setuptools && \
     poetry export -f requirements.txt --only main | /opt/venv/bin/pip install -r /dev/stdin && \
