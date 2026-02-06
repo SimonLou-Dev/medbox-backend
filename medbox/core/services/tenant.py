@@ -68,6 +68,33 @@ class TenantService:
         """
         return await self.tenant_repo.get_with_counts(m_id)
 
+    async def update(self, m_id: UUID, body: TenantRequest) -> Tenant:
+        """Met à jour un tenant.
+
+        Parameters
+        ----------
+        m_id : UUID
+            Identifiant du tenant
+        body : TenantRequest
+            Nouvelles données
+
+        Returns
+        -------
+        Tenant
+            Tenant mis à jour
+
+        Raises
+        ------
+        HTTPException :
+            Si le tenant n'existe pas.
+
+        """
+        tenant = await self.tenant_repo.get(m_id)
+        if tenant is None:
+            raise HTTPException(status_code=404, detail="Tenant introuvable")
+
+        return await self.tenant_repo.update(m_id, {"name": body.name})
+
     async def delete(self, m_id: UUID) -> bool:
         """Supprime le tenant.
 
