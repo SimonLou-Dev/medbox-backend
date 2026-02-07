@@ -163,6 +163,7 @@ async def logout(
     # Construire l'URL de logout
     post_logout_uri = redirect_uri or f"{settings.app_url}/"
     params = {
+        "client_id": settings.keycloak_client_id,
         "post_logout_redirect_uri": post_logout_uri,
     }
 
