@@ -212,14 +212,14 @@ class SecurityService:
     async def exchange_code(
         self,
         code: str,
-    ) -> tuple[LightWeightUserContext, str, str | None]:
+    ) -> tuple[LightWeightUserContext, str, str | None, str | None]:
         """Échange un code d'autorisation contre des tokens.
 
         Args:
             code: Le code d'autorisation OAuth2
 
         Returns:
-            Tuple contenant (UserContext, access_token, refresh_token)
+            Tuple contenant (UserContext, access_token, refresh_token, id_token)
 
         Raises:
             HTTPException: Si l'échange échoue
@@ -253,7 +253,12 @@ class SecurityService:
         claims = await self.decode_token(tokens["access_token"])
         user_context = LightWeightUserContext(claims=claims)
 
-        return user_context, tokens["access_token"], tokens.get("refresh_token")
+        return (
+            user_context,
+            tokens["access_token"],
+            tokens.get("refresh_token"),
+            tokens.get("id_token"),
+        )
 
     async def refresh_token(self, refresh_token: str) -> TokenResponse:
         """Rafraîchit un access token à partir d'un refresh token.

@@ -79,7 +79,7 @@ async def callback(
 
     """
     # Échange du code contre les tokens
-    ctx, access_token, refresh_token = await security.exchange_code(code)
+    ctx, access_token, refresh_token, id_token = await security.exchange_code(code)
 
     # Enregistrement/mise à jour de l'utilisateur en DB
     await user_service.sync_user_from_identity_provider(ctx)
@@ -92,7 +92,7 @@ async def callback(
         response = Response(status_code=status.HTTP_204_NO_CONTENT)
 
     # Configurer les cookies d'authentification
-    _set_auth_cookies(response, access_token, refresh_token or "")
+    _set_auth_cookies(response, access_token, refresh_token or "", id_token or "")
 
     return response
 
@@ -147,6 +147,7 @@ async def logout(
     _: CurrentUser,
     redirect_uri: Annotated[str | None, Query()] = None,
     id_token_hint: Annotated[str | None, Query()] = None,
+    id_token_cookie: Annotated[str | None, Cookie(alias="id_token")] = None,
 ) -> JSONResponse:
     """Déconnecte l'utilisateur de Keycloak.
 
@@ -167,8 +168,10 @@ async def logout(
         "post_logout_redirect_uri": post_logout_uri,
     }
 
-    if id_token_hint:
-        params["id_token_hint"] = id_token_hint
+    # Utiliser l'id_token du cookie si disponible (priorité au query param)
+    id_token = id_token_hint or id_token_cookie
+    if id_token:
+        params["id_token_hint"] = id_token
 
     query_string = urllib.parse.urlencode(params)
     logout_url = f"{security.logout_endpoint}?{query_string}"
@@ -185,6 +188,7 @@ async def logout(
     }
     response.delete_cookie("access_token", **cookie_delete_config)
     response.delete_cookie("refresh_token", **cookie_delete_config)
+    response.delete_cookie("id_token", **cookie_delete_config)
     response.delete_cookie("csrf_token", secure=True, samesite="none")
 
     return response
@@ -234,6 +238,7 @@ def _set_auth_cookies(
     response: RedirectResponse | JSONResponse,
     access_token: str,
     refresh_token: str,
+    id_token: str = "",
 ) -> None:
     """Configure les cookies d'authentification.
 
@@ -241,6 +246,7 @@ def _set_auth_cookies(
         response: La réponse HTTP
         access_token: Le token d'accès
         refresh_token: Le token de rafraîchissement
+        id_token: Le token d'identité (pour le logout Keycloak)
 
     """
     cookie_config = {
@@ -256,6 +262,13 @@ def _set_auth_cookies(
         refresh_token,
         **{**cookie_config, "max_age": 2592000},  # 30 jours pour le refresh token
     )
+
+    if id_token:
+        response.set_cookie(
+            "id_token",
+            id_token,
+            **{**cookie_config, "max_age": 2592000},  # 30 jours
+        )
 
     csrf = secrets.token_urlsafe(32)
     response.set_cookie(
