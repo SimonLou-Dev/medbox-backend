@@ -145,6 +145,7 @@ async def refresh_token(
 async def logout(
     security: SecuritySvcDep,
     _: CurrentUser,
+    redirect_uri: Annotated[str | None, Query()] = None,
     id_token_hint: Annotated[str | None, Query()] = None,
 ) -> JSONResponse:
     """Déconnecte l'utilisateur de Keycloak.
@@ -152,6 +153,7 @@ async def logout(
     Args:
         _: Contexte de l'utilisateur
         security: Service de gestion de l'auth
+        redirect_uri: URL de redirection après logout Keycloak (optionnel)
         id_token_hint: Token ID pour améliorer la déconnexion (optionnel)
 
     Returns:
@@ -159,8 +161,9 @@ async def logout(
 
     """
     # Construire l'URL de logout
+    post_logout_uri = redirect_uri or f"{settings.app_url}/"
     params = {
-        "post_logout_redirect_uri": f"{settings.app_url}/",
+        "post_logout_redirect_uri": post_logout_uri,
     }
 
     if id_token_hint:
