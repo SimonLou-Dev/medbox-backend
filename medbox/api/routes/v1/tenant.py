@@ -73,8 +73,7 @@ async def get_tenant(
 
     """
     await tenant_right_svc.ensure_user_in_tenant_or_fail(user.subject, tenant_id)
-    tenant = await tenant_svc.get(tenant_id)
-    return TenantResponse.model_validate(tenant)
+    return await tenant_svc.get(tenant_id)
 
 
 @router.put(
@@ -107,8 +106,8 @@ async def update_tenant(
         tenant_id,
         UserRoles.TENANT_ADMIN,
     )
-    tenant = await tenant_svc.update(tenant_id, body)
-    return TenantResponse.model_validate(tenant)
+    await tenant_svc.update(tenant_id, body)
+    return await tenant_svc.get(tenant_id)
 
 
 @router.delete(
