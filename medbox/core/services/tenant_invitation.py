@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
-from medbox.core.constants.enums import InviteStatus
+from medbox.core.constants.enums import InviteStatus, UserStatus
 from medbox.core.db.models.invitation import Invitation
 from medbox.core.db.models.user import User
 from medbox.core.db.repositories.invitation import InvitationRepository
@@ -196,8 +196,9 @@ class TenantInvitationService:
                 detail="L'invitation a expiré",
             )
 
-        # On met le user dans le TENANT
+        # On met le user dans le TENANT et on l'active
         await self.add_user_to_tenant(user_id=user.id, tenant_id=invitation.tenant_id)
+        await self.user_repo.update(user.id, {"status": UserStatus.ACTIVE})
 
         # On ferme l'invitation
         await self.invite_repo.update(
