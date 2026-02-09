@@ -1,6 +1,6 @@
 import secrets
 import string
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -108,7 +108,7 @@ class TenantInvitationService:
                 {"status": InviteStatus.EXPIRED},
             )
 
-        expires = datetime.now() + timedelta(minutes=10)
+        expires = datetime.now(tz=UTC) + timedelta(minutes=10)
 
         invite = Invitation(
             tenant_id=tenant_id,
@@ -190,7 +190,7 @@ class TenantInvitationService:
                 detail="L'invitation n'est plus valide",
             )
 
-        if invitation.expires_at < datetime.now():
+        if invitation.expires_at < datetime.now(tz=UTC):
             raise HTTPException(
                 status_code=400,
                 detail="L'invitation a expiré",

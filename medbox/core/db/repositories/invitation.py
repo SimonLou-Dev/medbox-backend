@@ -1,6 +1,6 @@
 """Repository Invitation."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -36,7 +36,7 @@ class InvitationRepository(BaseRepository[Invitation]):
             stmt = (
                 select(self.model)
                 .where(self.model.tenant_id == tenant_id)
-                .where(self.model.expires_at > datetime.now())
+                .where(self.model.expires_at > datetime.now(tz=UTC))
                 .where(self.model.status == InviteStatus.PENDING)
             )
             result = await session.execute(stmt)
