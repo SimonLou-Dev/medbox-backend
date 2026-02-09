@@ -9,7 +9,6 @@ from medbox.api.deps.response import ok_response
 from medbox.core.constants.enums import UserRoles
 from medbox.core.dto.invitation import (
     ClaimInvitationDTO,
-    ResponseInvitationDTO,
     ResponseInvitationWithCodeDTO,
 )
 from medbox.core.services import (
@@ -49,34 +48,9 @@ async def accept_invitation(
     raise HTTPException(status_code="400", detail="Vous êtes déja dans un tenant.")
 
 
-@admin_router.patch("/{invitation_id}/revoke")
-async def revoke_invitation(
-    invitation_id: str,
-    _: Annotated[
-        UserContext,
-        Depends(require_tenant_role(UserRoles.TENANT_ADMIN)),
-    ],
-    tenant_invite_svc: TenantInvitSvcDep,
-) -> JSONResponse:
-    """Permet de forcer l'expiration d'une invitation.
-
-    Nécessite le rôle TENANT_ADMIN.
-
-    Args:
-        invitation_id: UUID de l'invitation
-        _: Utilisateur authentifié avec rôle admin
-        tenant_invite_svc: Service des invitation tenants
-
-    """
-    await tenant_invite_svc.expire_invitation(invitation_id)
-
-    return ok_response
-
-
-@admin_router.post("/send")
-async def send_invitation(
+@admin_router.post("/generate")
+async def generate_invite_code(
     tenant_id: str,
-    target_email: str,
     user_ctx: Annotated[
         UserContext,
         Depends(require_tenant_role(UserRoles.TENANT_ADMIN)),
@@ -84,55 +58,42 @@ async def send_invitation(
     tenant_invite_svc: TenantInvitSvcDep,
     user_svc: UserSvcDep,
 ) -> ResponseInvitationWithCodeDTO:
-    """Envoie une invitation pour joindre le tenant.
+    """Génère un code d'invitation temporaire (10 min, usage unique).
 
     Nécessite le rôle TENANT_ADMIN.
-    Route: POST /api/v1/tenant/{tenant_id}/invite/send
-
-    Args:
-        tenant_id: UUID du tenant
-        target_email: Email de la personne à inviter
-        user_ctx: Utilisateur authentifié avec rôle admin
-        tenant_invite_svc: Service des invitation tenants
-        user_svc: Service utilisateurs
-
-    Returns:
-        ResponseInvitationWithCodeDTO: Code d'invitation généré
-
-    Raises:
-        HTTPException: Si l'email existe déjà ou invitation en cours
+    Route: POST /api/v1/tenant/{tenant_id}/invite/generate
 
     """
     sender = await user_svc.get_user_from_subject(user_ctx.subject)
-    invitation = await tenant_invite_svc.invite_user_to_tenant(
+    invitation = await tenant_invite_svc.generate_invite_code(
         sender=sender,
-        target_mail=target_email,
         tenant_id=tenant_id,
     )
-    return ResponseInvitationWithCodeDTO(code=invitation.code)
+    return ResponseInvitationWithCodeDTO(
+        code=invitation.code,
+        expires_at=invitation.expires_at,
+    )
 
 
-@admin_router.get("/")
-async def list_invitations(
+@admin_router.get("/active")
+async def get_active_code(
     tenant_id: str,
     _: Annotated[
         UserContext,
         Depends(require_tenant_role(UserRoles.TENANT_ADMIN)),
     ],
     tenant_invite_svc: TenantInvitSvcDep,
-) -> list[ResponseInvitationDTO]:
-    """Lister les invitations d'un tenant.
+) -> ResponseInvitationWithCodeDTO | None:
+    """Retourne le code d'invitation actif du tenant ou null.
 
     Nécessite le rôle TENANT_ADMIN.
-
-    Args:
-        tenant_id: UUID du tenant
-        _: Utilisateur authentifié avec rôle admin
-        tenant_invite_svc: Service des invitation tenants
-
-    Returns:
-        list[ResponseInvitationDTO]: Liste des invitations du tenant
+    Route: GET /api/v1/tenant/{tenant_id}/invite/active
 
     """
-    result = await tenant_invite_svc.get_paginated_invitations(tenant_id=tenant_id)
-    return result.items
+    invitation = await tenant_invite_svc.get_active_code(tenant_id)
+    if not invitation:
+        return None
+    return ResponseInvitationWithCodeDTO(
+        code=invitation.code,
+        expires_at=invitation.expires_at,
+    )

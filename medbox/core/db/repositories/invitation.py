@@ -1,6 +1,7 @@
 """Repository Invitation."""
 
 from datetime import datetime
+from uuid import UUID
 
 from sqlalchemy import select
 
@@ -17,29 +18,24 @@ class InvitationRepository(BaseRepository[Invitation]):
         """Constructeur."""
         super().__init__(Invitation)
 
-    async def get_valid_by_email(self, email: str) -> Invitation | None:
-        """Recherche une invitation valide par email.
+    async def get_active_by_tenant(self, tenant_id: UUID) -> Invitation | None:
+        """Recherche le code d'invitation actif (PENDING, non expiré) pour un tenant.
 
         Parameters
         ----------
-        email : str
-            Email de l'utilisateur à créer
+        tenant_id : UUID
+            Identifiant du tenant
 
         Returns
         -------
-        Invitation
-            Invitation crée.
-
-        Raises
-        ------
-        HTTPException :
-            Si l'objet n'existe pas ou déja dans un tenant, ou déja  une invité"
+        Invitation | None
+            L'invitation active ou None
 
         """
         async with async_session_local() as session:
             stmt = (
                 select(self.model)
-                .where(self.model.email == email)
+                .where(self.model.tenant_id == tenant_id)
                 .where(self.model.expires_at > datetime.now())
                 .where(self.model.status == InviteStatus.PENDING)
             )
@@ -56,13 +52,8 @@ class InvitationRepository(BaseRepository[Invitation]):
 
         Returns
         -------
-        Invitation
-            Invitation crée.
-
-        Raises
-        ------
-        HTTPException :
-            Si l'objet n'existe pas ou déja dans un tenant, ou déja  une invité"
+        Invitation | None
+            Invitation trouvée ou None
 
         """
         async with async_session_local() as session:

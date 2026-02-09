@@ -27,10 +27,10 @@ class Invitation(Base, IDMixin, TimestampMixin):
         nullable=False,
     )
 
-    email: Mapped[str] = mapped_column(
+    email: Mapped[str | None] = mapped_column(
         String(320),
-        nullable=False,
-        doc="Email ciblé par l'invitation",
+        nullable=True,
+        doc="Email ciblé par l'invitation (nullable, non utilisé dans le nouveau flow)",
     )
 
     code: Mapped[str] = mapped_column(

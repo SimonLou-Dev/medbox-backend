@@ -11,8 +11,6 @@ from medbox.core.db.models.user import User
 from medbox.core.db.repositories.invitation import InvitationRepository
 from medbox.core.db.repositories.tenant import TenantRepository
 from medbox.core.db.repositories.user import UserRepository
-from medbox.core.dto.invitation import ResponseInvitationDTO
-from medbox.core.dto.page import PaginatedDTO
 from medbox.core.exceptions import ModelNotFoundError
 from medbox.core.tasks import expire_invitation
 
@@ -74,58 +72,46 @@ class TenantInvitationService:
                 detail="L'utilisateur est déjà dans un tenant.",
             )
 
-        # On pourrait créer une invitation ici, mais si tu veux assigner direct :
         return await self.user_repo.update(
             user_id,
             values={"tenant_id": tenant_id},
         )
 
-    async def invite_user_to_tenant(
+    async def generate_invite_code(
         self,
         sender: User,
-        target_mail: str,
         tenant_id: UUID,
     ) -> Invitation:
-        """Créé une invitation permettant de joindre un utilisateur.
+        """Génère un code d'invitation temporaire pour rejoindre le tenant.
+
+        Expire les codes actifs précédents avant d'en créer un nouveau
+        (1 seul code actif par tenant). Durée de validité : 10 minutes.
 
         Parameters
         ----------
         sender : User
-            Identifiant de l'utilisateur qui a envoyé l'invitation
-        target_mail : str
-            Email de l'utilisateur à créer
+            Utilisateur qui génère le code
         tenant_id : UUID
-            Tenant dans lequel ajouter l'utilisateur
+            Tenant pour lequel générer le code
 
         Returns
         -------
         Invitation
-            Invitation crée.
-
-        Raises
-        ------
-        HTTPException :
-            Si l'objet n'existe pas ou déja dans un tenant, ou déja  une invité"
+            Invitation créée avec le code.
 
         """
-        # NOTE: Check désactivé pour permettre d'inviter des utilisateurs existants
-        # if await self.user_repo.exists({"email": target_mail}):
-        #     raise HTTPException(
-        #         status_code=400,
-        #         detail="L'utilisateur avec cette addresse mail existe déja",
-        #     )
-
-        if await self.invite_repo.get_valid_by_email(target_mail):
-            raise HTTPException(
-                status_code=400,
-                detail="L'utilisateur a déja une invitation en cours.",
+        # Expire le code actif précédent s'il existe
+        active = await self.invite_repo.get_active_by_tenant(tenant_id)
+        if active:
+            await self.invite_repo.update(
+                active.id,
+                {"status": InviteStatus.EXPIRED},
             )
 
-        expires = datetime.now() + timedelta(hours=1)
+        expires = datetime.now() + timedelta(minutes=10)
 
         invite = Invitation(
             tenant_id=tenant_id,
-            email=target_mail,
             code=await self._generate_invitation_code(),
             expires_at=expires,
             sended_by_user_id=sender.id,
@@ -135,7 +121,7 @@ class TenantInvitationService:
 
         expire_invitation.send_with_options(
             args=[str(invite.id)],
-            delay=3600 * 1000,  # Dramatiq prend les ms
+            delay=600_000,  # 10 min en ms
         )
 
         return invite
@@ -155,7 +141,7 @@ class TenantInvitationService:
         Raises
         ------
         HTTPException :
-            Si l'invitation n'existe pas"
+            Si l'invitation n'existe pas
 
         """
         if not await self.invite_repo.exists({"id": invitation_id}):
@@ -170,7 +156,7 @@ class TenantInvitationService:
         )
 
     async def claim_invitation(self, code: str, user: User) -> bool:
-        """Supprime une invitation.
+        """Permet à un utilisateur de rejoindre un tenant via un code d'invitation.
 
         Parameters
         ----------
@@ -182,17 +168,17 @@ class TenantInvitationService:
         Returns
         -------
         Boolean
-            True si accepté, False si refusé
+            True si accepté
 
         Raises
         ------
         HTTPException :
-            Si l'invitation n'existe pas
+            Si le code est invalide ou l'invitation n'est plus valide
 
         """
         invitation = await self.invite_repo.get_by_code(code)
 
-        if not invitation or invitation.email != user.email:
+        if not invitation:
             raise HTTPException(
                 status_code=404,
                 detail="Le code saisi est invalide",
@@ -200,8 +186,14 @@ class TenantInvitationService:
 
         if invitation.status is not InviteStatus.PENDING:
             raise HTTPException(
-                status_code=404,
+                status_code=400,
                 detail="L'invitation n'est plus valide",
+            )
+
+        if invitation.expires_at < datetime.now():
+            raise HTTPException(
+                status_code=400,
+                detail="L'invitation a expiré",
             )
 
         # On met le user dans le TENANT
@@ -252,6 +244,22 @@ class TenantInvitationService:
             },
         )
 
+    async def get_active_code(self, tenant_id: UUID) -> Invitation | None:
+        """Retourne le code d'invitation actif du tenant.
+
+        Parameters
+        ----------
+        tenant_id : UUID
+            Identifiant du tenant
+
+        Returns
+        -------
+        Invitation | None
+            L'invitation active ou None
+
+        """
+        return await self.invite_repo.get_active_by_tenant(tenant_id)
+
     async def _generate_invitation_code(self) -> str:
         """Créé un code d'invitation unique.
 
@@ -265,29 +273,3 @@ class TenantInvitationService:
             code: str = "".join(secrets.choice(string.digits) for _ in range(6))
             if not await self.invite_repo.exists({"code": code}):
                 return code
-
-    async def get_paginated_invitations(
-        self,
-        tenant_id: str,
-    ) -> PaginatedDTO[ResponseInvitationDTO]:
-        """List les invitations d'un tenant.
-
-        Parameters
-        ----------
-        tenant_id : UUID
-            Tenant dans lequel ajouter l'utilisateur
-
-        Returns
-        -------
-        list[ResponseInvitationDTO]
-            Liste des invitation
-
-        Raises
-        ------
-        HTTPException :
-            Si l'objet n'existe pas.
-
-        """
-        paginated = await self.invite_repo.paginate(filters={"tenant_id": tenant_id})
-
-        return PaginatedDTO.to_dto_page(paginated, ResponseInvitationDTO)
