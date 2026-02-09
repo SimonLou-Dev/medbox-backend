@@ -126,6 +126,43 @@ class TenantService:
 
         return True
 
+    async def leave_tenant(self, user_subject: str) -> None:
+        """Permet a un utilisateur non-admin de quitter son tenant.
+
+        Parameters
+        ----------
+        user_subject : str
+            Subject Keycloak de l'utilisateur
+
+        Raises
+        ------
+        HTTPException :
+            Si l'utilisateur n'est pas dans un tenant ou est admin.
+
+        """
+        user = await self.user_repo.get_by_subject_or_fail(user_subject)
+
+        if user.tenant_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Vous n'appartenez a aucun etablissement",
+            )
+
+        if user.role == UserRoles.TENANT_ADMIN:
+            raise HTTPException(
+                status_code=403,
+                detail="Un administrateur ne peut pas quitter l'etablissement",
+            )
+
+        await self.user_repo.update(
+            user.id,
+            {
+                "tenant_id": None,
+                "role": UserRoles.DEFAULT,
+                "status": UserStatus.PENDING,
+            },
+        )
+
     async def create(self, body: TenantRequest, usr_ctx: UserContext) -> (Tenant, User):
         """Crée un nouveau tenant.
 

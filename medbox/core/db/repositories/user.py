@@ -1,10 +1,12 @@
 """Repository pour les utilisateurs."""
 
 from collections.abc import Sequence
+from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 
+from medbox.core.constants.enums import UserRoles
 from medbox.core.db.models.user import User
 from medbox.core.db.repositories.base import BaseRepository
 from medbox.core.db.session import async_session_local
@@ -99,3 +101,61 @@ class UserRepository(BaseRepository[User]):
                     detail="Impossible de trouver l'utilisateur",
                 )
             return usr
+
+    async def list_by_tenant(self, tenant_id: UUID) -> Sequence[User]:
+        """Renvoie tous les utilisateurs d'un tenant.
+
+        Parameters
+        ----------
+        tenant_id : UUID
+            Identifiant du tenant
+
+        Returns
+        -------
+        Sequence[User]
+            Liste des utilisateurs du tenant.
+
+        """
+        async with async_session_local() as session:
+            stmt = (
+                select(self.model)
+                .where(self.model.tenant_id == tenant_id)
+                .order_by(self.model.created_at.desc())
+            )
+            result = await session.execute(stmt)
+            return result.scalars().all()
+
+    async def count_by_tenant_and_role(self, tenant_id: UUID) -> dict[str, int]:
+        """Renvoie les counts d'utilisateurs par role pour un tenant.
+
+        Parameters
+        ----------
+        tenant_id : UUID
+            Identifiant du tenant
+
+        Returns
+        -------
+        dict[str, int]
+            Counts par role + total.
+
+        """
+        async with async_session_local() as session:
+            stmt = (
+                select(
+                    func.count().label("total"),
+                    func.count(case((self.model.role == UserRoles.TENANT_ADMIN, 1))).label("admin_count"),
+                    func.count(case((self.model.role == UserRoles.CAREGIVER, 1))).label("caregiver_count"),
+                    func.count(case((self.model.role == UserRoles.PATIENT, 1))).label("patient_role_count"),
+                    func.count(case((self.model.role == UserRoles.DEFAULT, 1))).label("default_count"),
+                )
+                .where(self.model.tenant_id == tenant_id)
+            )
+            result = await session.execute(stmt)
+            row = result.one()
+            return {
+                "total": row.total,
+                "admin_count": row.admin_count,
+                "caregiver_count": row.caregiver_count,
+                "patient_role_count": row.patient_role_count,
+                "default_count": row.default_count,
+            }

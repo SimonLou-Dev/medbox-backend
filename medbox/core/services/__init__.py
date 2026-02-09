@@ -18,6 +18,7 @@ from medbox.core.services.security import (
     require_roles,
     require_user,
 )
+from medbox.core.services.admin import AdminService
 from medbox.core.services.tenant import TenantService
 from medbox.core.services.tenant_invitation import TenantInvitationService
 from medbox.core.services.tenant_right import (
@@ -59,6 +60,15 @@ def get_tenant_right_service() -> TenantRightService:
     return TenantRightService(UserRepository(), TenantRepository())
 
 
+def get_admin_service() -> AdminService:
+    """Cree Factory pour le service admin."""
+    return AdminService(
+        user_repo=UserRepository(),
+        tenant_repo=TenantRepository(),
+        invite_repo=InvitationRepository(),
+    )
+
+
 def get_tenant_service(
     tenant_invit_svc: Annotated[
         TenantInvitationService,
@@ -88,6 +98,7 @@ TenantInvitSvcDep = Annotated[
     Depends(get_tenant_invitation_service),
 ]
 TenantRightSvcDep = Annotated[TenantRightService, Depends(get_tenant_right_service)]
+AdminSvcDep = Annotated[AdminService, Depends(get_admin_service)]
 
 # Authentification
 CurrentUser = Annotated[UserContext, Depends(require_user)]

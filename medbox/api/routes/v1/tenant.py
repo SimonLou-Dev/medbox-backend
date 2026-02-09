@@ -110,6 +110,29 @@ async def update_tenant(
     return await tenant_svc.get(tenant_id)
 
 
+@router.post(
+    "/{tenant_id}/leave",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def leave_tenant(
+    tenant_id: UUID,
+    user: CurrentUser,
+    tenant_svc: TenantSvcDep,
+    tenant_right_svc: TenantRightSvcDep,
+) -> None:
+    """Permet a un utilisateur non-admin de quitter le tenant.
+
+    Args:
+        tenant_id: UUID du tenant
+        user: Utilisateur authentifie
+        tenant_svc: Service des tenants
+        tenant_right_svc: Service des droits
+
+    """
+    await tenant_right_svc.ensure_user_in_tenant_or_fail(user.subject, tenant_id)
+    await tenant_svc.leave_tenant(user.subject)
+
+
 @router.delete(
     "/{tenant_id}",
     status_code=status.HTTP_204_NO_CONTENT,

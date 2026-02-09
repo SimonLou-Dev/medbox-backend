@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from medbox.api.routes.v1.admin import router as admin_router
 from medbox.api.routes.v1.global_medication import global_medication_router
 from medbox.api.routes.v1.health import health_router_v1
 from medbox.api.routes.v1.invitation import admin_router as admin_invitation_router
@@ -19,4 +20,5 @@ router_v1.include_router(admin_invitation_router)
 router_v1.include_router(oauth2_router)
 router_v1.include_router(tenant_router)
 router_v1.include_router(patient_router)
+router_v1.include_router(admin_router)
 router_v1.include_router(global_medication_router)
