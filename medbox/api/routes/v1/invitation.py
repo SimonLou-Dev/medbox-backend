@@ -40,9 +40,10 @@ async def accept_invitation(
     tenant_invite_svc: TenantInvitSvcDep,
 ) -> JSONResponse:
     """Permet de rejoindre un tenant via le code."""
-    user: User = await user_svc.get_user_from_subject(user.subject)
-    if await tenant_right_svc.ensure_user_not_in_tenant(user.subject):
-        await tenant_invite_svc.claim_invitation(body.code, user)
+    subject = user.subject
+    db_user: User = await user_svc.get_user_from_subject(subject)
+    if await tenant_right_svc.ensure_user_not_in_tenant(subject):
+        await tenant_invite_svc.claim_invitation(body.code, db_user)
         return ok_response
 
     raise HTTPException(status_code="400", detail="Vous êtes déja dans un tenant.")
