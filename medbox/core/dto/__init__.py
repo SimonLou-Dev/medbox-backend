@@ -6,6 +6,6 @@ from medbox.core.dto.page import PaginatedDTO
 
 __all__ = [
     "ClaimInvitationDTO",
-    "ResponseInvitationWithCodeDTO",
     "PaginatedDTO",
+    "ResponseInvitationWithCodeDTO",
 ]

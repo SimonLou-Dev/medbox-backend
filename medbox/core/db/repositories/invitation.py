@@ -1,9 +1,8 @@
 """Repository Invitation."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from uuid import UUID
-
-from collections.abc import Sequence
 
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import selectinload

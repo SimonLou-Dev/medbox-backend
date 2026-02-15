@@ -9,6 +9,7 @@ from fastapi import Depends
 from medbox.core.db.repositories.invitation import InvitationRepository
 from medbox.core.db.repositories.tenant import TenantRepository
 from medbox.core.db.repositories.user import UserRepository
+from medbox.core.services.admin import AdminService
 from medbox.core.services.security import (
     SecurityService,
     UserContext,
@@ -18,7 +19,6 @@ from medbox.core.services.security import (
     require_roles,
     require_user,
 )
-from medbox.core.services.admin import AdminService
 from medbox.core.services.tenant import TenantService
 from medbox.core.services.tenant_invitation import TenantInvitationService
 from medbox.core.services.tenant_right import (

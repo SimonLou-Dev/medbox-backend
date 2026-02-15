@@ -85,7 +85,7 @@ class TokenResponse(BaseModel):
 
     access_token: str
     refresh_token: str | None = None
-    token_type: str = "Bearer"
+    token_type: str = "Bearer"  # noqa: S105
     expires_in: int | None = None
 
 

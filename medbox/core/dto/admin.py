@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 from medbox.core.constants.enums import UserRoles
 
-
 # ==============================================================================
 # Response DTOs
 # ==============================================================================
