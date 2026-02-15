@@ -75,3 +75,8 @@ class Prescription(Base, IDMixin, TimestampMixin):
         back_populates="prescription",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def has_document(self) -> bool:
+        """Whether a document is attached."""
+        return self.document_s3_key is not None

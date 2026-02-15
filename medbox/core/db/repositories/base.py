@@ -484,9 +484,15 @@ class BaseRepository(Generic[ModelType]):
                 raise AttributeError(msg)
 
             load_opt = selectinload(attr)
+            current_model = attr.property.mapper.class_
 
             for sub in parts[1:]:
-                load_opt = load_opt.selectinload(sub)
+                sub_attr = getattr(current_model, sub, None)
+                if sub_attr is None:
+                    msg = f"{current_model.__name__} has no relation '{sub}'"
+                    raise AttributeError(msg)
+                load_opt = load_opt.selectinload(sub_attr)
+                current_model = sub_attr.property.mapper.class_
 
             stmt = stmt.options(load_opt)
 

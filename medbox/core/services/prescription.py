@@ -120,7 +120,7 @@ class PrescriptionService:
         # Load relations for response
         created_with_relations = await self.prescription_repo.get(
             created.id,
-            relations=["items", "patient"],
+            relations=["items", "items.medication", "patient"],
         )
         if not created_with_relations:
             raise HTTPException(
@@ -201,7 +201,7 @@ class PrescriptionService:
             page=page,
             per_page=per_page,
             status=status,
-            relations=["items"],
+            relations=["items", "items.medication", "patient"],
         )
 
         return {
@@ -211,7 +211,7 @@ class PrescriptionService:
             "total": page_result.total,
             "page": page_result.page,
             "per_page": page_result.per_page,
-            "pages": page_result.pages,
+            "pages": page_result.total_pages,
         }
 
     async def update(
@@ -240,8 +240,11 @@ class PrescriptionService:
             400 if validation fails
 
         """
-        # Load existing prescription
-        prescription = await self._validate_prescription_in_tenant(prescription_id)
+        # Load existing prescription with items
+        prescription = await self._validate_prescription_in_tenant(
+            prescription_id,
+            relations=["items"],
+        )
 
         # Validate patient
         if data.patient_id != prescription.patient_id:
@@ -281,7 +284,7 @@ class PrescriptionService:
         # Reload with relations
         updated_with_relations = await self.prescription_repo.get(
             updated.id,
-            relations=["items", "patient"],
+            relations=["items", "items.medication", "patient"],
         )
         if not updated_with_relations:
             raise HTTPException(
@@ -319,7 +322,7 @@ class PrescriptionService:
         # Reload with relations
         updated_with_relations = await self.prescription_repo.get(
             updated.id,
-            relations=["items", "patient"],
+            relations=["items", "items.medication", "patient"],
         )
         if not updated_with_relations:
             raise HTTPException(
@@ -411,7 +414,7 @@ class PrescriptionService:
         # Reload with relations
         updated_with_relations = await self.prescription_repo.get(
             updated.id,
-            relations=["items", "patient"],
+            relations=["items", "items.medication", "patient"],
         )
         if not updated_with_relations:
             raise HTTPException(
@@ -476,7 +479,7 @@ class PrescriptionService:
         # Reload with relations
         updated_with_relations = await self.prescription_repo.get(
             updated.id,
-            relations=["items", "patient"],
+            relations=["items", "items.medication", "patient"],
         )
         if not updated_with_relations:
             raise HTTPException(
@@ -541,7 +544,7 @@ class PrescriptionService:
         # Reload with relations
         updated_with_relations = await self.prescription_repo.get(
             updated.id,
-            relations=["items", "patient"],
+            relations=["items", "items.medication", "patient"],
         )
         if not updated_with_relations:
             raise HTTPException(
@@ -675,7 +678,7 @@ class PrescriptionService:
         # Reload with relations
         updated_with_relations = await self.prescription_repo.get(
             updated.id,
-            relations=["items", "patient"],
+            relations=["items", "items.medication", "patient"],
         )
         if not updated_with_relations:
             raise HTTPException(
