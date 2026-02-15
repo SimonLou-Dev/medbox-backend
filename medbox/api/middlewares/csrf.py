@@ -46,11 +46,23 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             csrf_cookie = request.cookies.get(self.cookie_name)
             csrf_header = request.headers.get(self.header_name)
 
-            if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+            if csrf_cookie and csrf_header:
+                # Double-submit: both present → must match
+                if csrf_cookie != csrf_header:
+                    return JSONResponse(
+                        status_code=HTTP_403_FORBIDDEN,
+                        content={"detail": "CSRF blocked (token mismatch)"},
+                    )
+            elif not csrf_header:
+                # No header at all → always reject
                 return JSONResponse(
                     status_code=HTTP_403_FORBIDDEN,
-                    content={"detail": "CSRF blocked (token mismatch)"},
+                    content={"detail": "CSRF blocked (missing token)"},
                 )
+            # Header present without cookie (cross-origin / first request):
+            # The custom header itself proves this is an XHR from our app
+            # (browsers block cross-origin custom headers on simple requests).
+            # Origin is already validated above, so this is safe.
 
         response = await call_next(request)
 
