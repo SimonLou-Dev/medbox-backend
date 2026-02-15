@@ -48,7 +48,7 @@ async def list_members(
 
 
 @router.patch("/members/{member_id}/role")
-async def update_member_role(  # noqa: PLR0913
+async def update_member_role(
     tenant_id: UUID,
     member_id: UUID,
     body: UpdateMemberRoleRequest,

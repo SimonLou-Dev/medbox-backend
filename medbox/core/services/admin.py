@@ -190,7 +190,7 @@ class AdminService:
                 activities.append(
                     ActivityItem(
                         type="member_joined",
-                        description=f"{inv.claimed_by_user.c_full_name or inv.claimed_by_user.email} a rejoint l'etablissement",  # noqa: E501
+                        description=f"{inv.claimed_by_user.c_full_name or inv.claimed_by_user.email} a rejoint l'etablissement",
                         target_name=inv.claimed_by_user.c_full_name,
                         timestamp=inv.updated_at,
                     ),
