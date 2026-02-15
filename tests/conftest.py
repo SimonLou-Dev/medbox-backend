@@ -22,6 +22,7 @@ _SESSION_MODULES = [
     "medbox.core.db.repositories.user",
     "medbox.core.db.repositories.tenant",
     "medbox.core.db.repositories.invitation",
+    "medbox.core.db.repositories.prescription",
 ]
 
 

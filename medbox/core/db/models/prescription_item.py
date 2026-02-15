@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import JSON, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
@@ -40,16 +40,16 @@ class PrescriptionItem(Base, IDMixin, TimestampMixin):
         doc="Libellé tel que saisi sur l'ordonnance (pour trace).",
     )
 
-    dose: Mapped[str | None] = mapped_column(
-        String(64),
+    dose: Mapped[dict | None] = mapped_column(
+        JSON,
         nullable=True,
-        doc="Ex: '500 mg', '1 cp', '20 gouttes'",
+        doc="Structure: {'value': 500, 'unit': 'mg'}",
     )
 
-    frequency: Mapped[str] = mapped_column(
-        String(128),
+    frequency: Mapped[dict] = mapped_column(
+        JSON,
         nullable=False,
-        doc="Description humaine de la fréquence ex: '3x/jour', 'matin+soir'",
+        doc="Structure: {'times_per_day': 3, 'moments': ['matin', 'midi', 'soir'], 'pattern': '3x/jour'}",
     )
 
     # Tu pourras raffiner plus tard (matin/midi/soir, jours de la semaine etc.)

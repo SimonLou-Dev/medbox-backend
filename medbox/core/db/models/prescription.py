@@ -52,6 +52,20 @@ class Prescription(Base, IDMixin, TimestampMixin):
     start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # S3 document storage (ordonnance)
+    document_s3_key: Mapped[str | None] = mapped_column(
+        String(512),
+        nullable=True,
+        unique=True,
+    )
+    document_file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    document_file_size: Mapped[int | None] = mapped_column(nullable=True)
+    document_mime_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    document_uploaded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     tenant: Mapped[Tenant] = relationship(back_populates="prescriptions")
     patient: Mapped[Patient] = relationship(back_populates="prescriptions")
     created_by: Mapped[User | None] = relationship(
@@ -61,3 +75,8 @@ class Prescription(Base, IDMixin, TimestampMixin):
         back_populates="prescription",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def has_document(self) -> bool:
+        """Whether a document is attached."""
+        return self.document_s3_key is not None
