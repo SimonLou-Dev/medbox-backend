@@ -18,6 +18,36 @@ router = APIRouter(prefix="/oauth2", tags=["OAuth2"])
 # ==============================================================================
 
 
+@router.get("/csrf-token")
+async def get_csrf_token() -> Response:
+    """Génère un token CSRF pour les utilisateurs non authentifiés.
+
+    Permet aux pages login/register d'obtenir un cookie csrf_token
+    avant de soumettre un POST, afin que le middleware CSRF puisse
+    vérifier la correspondance cookie ↔ header.
+
+    Returns:
+        204 avec cookie csrf_token
+
+    """
+    csrf = secrets.token_urlsafe(32)
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.set_cookie(
+        "csrf_token",
+        csrf,
+        httponly=False,
+        secure=True,
+        samesite="none",
+        path="/",
+        max_age=2592000,
+    )
+    # Exposer le token dans le header pour que l'intercepteur axios
+    # puisse le capturer (le middleware ne le fait pas sur cette requête
+    # car le cookie n'existe pas encore dans la requête entrante).
+    response.headers["X-CSRF-Token"] = csrf
+    return response
+
+
 @router.get("/login")
 async def login(
     security: SecuritySvcDep,

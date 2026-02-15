@@ -107,8 +107,7 @@ app.add_middleware(
     exclude_prefixes=(
         "/docs",
         "/openapi.json",
-        "/v1/oauth2/direct-login",
-        "/v1/oauth2/register",
+        "/v1/oauth2/csrf-token",
     ),
 )
 
