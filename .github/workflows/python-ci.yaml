@@ -128,7 +128,6 @@ jobs:
           body: |
             <!-- ci-tests -->
             ${{ steps.pytest.outcome == 'success' && '✅ **Tests** — 28 passed' || '❌ **Tests échoués** — voir les annotations et l artefact test-results.' }}
-          edit-reason: seed
 
       - name: Fail if tests failed
         if: steps.pytest.outcome == 'failure'
@@ -192,7 +191,6 @@ jobs:
           body: |
             <!-- ci-pip-audit -->
             ⚠️ **pip-audit : vulnérabilités détectées** — téléchargez l'artefact `pip-audit-report` pour les détails.
-          edit-reason: seed
 
   # ---------------------------------------------------------------------------
   # Trivy — scan des Dockerfiles pour les misconfigurations
@@ -240,7 +238,6 @@ jobs:
           body: |
             <!-- ci-trivy-dockerfile -->
             ⚠️ **Trivy : problèmes détectés dans les Dockerfiles** — téléchargez l'artefact `trivy-dockerfile-report` (SARIF).
-          edit-reason: seed
 
       - name: Fail if findings
         if: steps.trivy.outcome == 'failure'

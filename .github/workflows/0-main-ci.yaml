@@ -10,6 +10,7 @@ jobs:
       contents: read
       checks: write     # pour mikepenz/action-junit-report
       issues: write     # pour les commentaires PR
+      pull-requests: write
     uses: ./.github/workflows/python-ci.yaml
 
   docker:
