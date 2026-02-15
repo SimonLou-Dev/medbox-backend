@@ -154,7 +154,12 @@ async def direct_login(
 
     """
     # Authentification via Keycloak
-    ctx, access_token, refresh_token, id_token = await security.authenticate_with_password(
+    (
+        ctx,
+        access_token,
+        refresh_token,
+        id_token,
+    ) = await security.authenticate_with_password(
         username=body.username,
         password=body.password,
     )
@@ -199,7 +204,12 @@ async def register(
     )
 
     # 2. Authentifier automatiquement le nouvel utilisateur
-    ctx, access_token, refresh_token, id_token = await security.authenticate_with_password(
+    (
+        ctx,
+        access_token,
+        refresh_token,
+        id_token,
+    ) = await security.authenticate_with_password(
         username=body.username,
         password=body.password,
     )
@@ -273,6 +283,7 @@ async def logout(
         security: Service de gestion de l'auth
         redirect_uri: URL de redirection après logout Keycloak (optionnel)
         id_token_hint: Token ID pour améliorer la déconnexion (optionnel)
+        id_token_cookie: Token ID depuis les cookies (optionnel)
 
     Returns:
         JSON avec l'URL de déconnexion Keycloak
@@ -344,8 +355,16 @@ async def update_profile(
     # On re-construit le full_name à partir des champs fournis ou existants
     new_full_name = user.full_name
     if body.first_name is not None or body.last_name is not None:
-        given = body.first_name if body.first_name is not None else user.claims.get("given_name", "")
-        family = body.last_name if body.last_name is not None else user.claims.get("family_name", "")
+        given = (
+            body.first_name
+            if body.first_name is not None
+            else user.claims.get("given_name", "")
+        )
+        family = (
+            body.last_name
+            if body.last_name is not None
+            else user.claims.get("family_name", "")
+        )
         new_full_name = f"{given} {family.upper()}".strip()
 
     new_email = body.email if body.email is not None else user.email

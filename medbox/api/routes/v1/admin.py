@@ -43,16 +43,19 @@ async def list_members(
     _: Annotated[UserContext, Depends(require_tenant_role(UserRoles.TENANT_ADMIN))],
     admin_svc: AdminSvcDep,
 ) -> MemberListResponse:
-    """Liste des membres du tenant. Necessite TENANT_ADMIN."""
+    """List des membres du tenant. Necessite TENANT_ADMIN."""
     return await admin_svc.list_members(tenant_id)
 
 
 @router.patch("/members/{member_id}/role")
-async def update_member_role(
+async def update_member_role(  # noqa: PLR0913
     tenant_id: UUID,
     member_id: UUID,
     body: UpdateMemberRoleRequest,
-    user_ctx: Annotated[UserContext, Depends(require_tenant_role(UserRoles.TENANT_ADMIN))],
+    user_ctx: Annotated[
+        UserContext,
+        Depends(require_tenant_role(UserRoles.TENANT_ADMIN)),
+    ],
     admin_svc: AdminSvcDep,
     user_svc: UserSvcDep,
 ) -> MemberResponse:
@@ -73,7 +76,10 @@ async def update_member_role(
 async def remove_member(
     tenant_id: UUID,
     member_id: UUID,
-    user_ctx: Annotated[UserContext, Depends(require_tenant_role(UserRoles.TENANT_ADMIN))],
+    user_ctx: Annotated[
+        UserContext,
+        Depends(require_tenant_role(UserRoles.TENANT_ADMIN)),
+    ],
     admin_svc: AdminSvcDep,
     user_svc: UserSvcDep,
 ) -> None:

@@ -53,7 +53,7 @@ class AdminService:
         )
 
     async def list_members(self, tenant_id: UUID) -> MemberListResponse:
-        """Liste tous les membres du tenant."""
+        """List tous les membres du tenant."""
         users = await self.user_repo.list_by_tenant(tenant_id)
         members = [
             MemberResponse(
@@ -84,7 +84,10 @@ class AdminService:
             raise HTTPException(404, "Membre introuvable dans ce tenant")
 
         if user.role == UserRoles.TENANT_ADMIN:
-            raise HTTPException(400, "Impossible de modifier le role d'un administrateur")
+            raise HTTPException(
+                400,
+                "Impossible de modifier le role d'un administrateur",
+            )
 
         if new_role == UserRoles.TENANT_ADMIN:
             raise HTTPException(400, "Impossible de promouvoir en administrateur")
@@ -144,10 +147,16 @@ class AdminService:
                 status=inv.status.value,
                 expires_at=inv.expires_at,
                 created_at=inv.created_at,
-                sent_by_name=inv.sended_by_user.c_full_name if inv.sended_by_user else None,
+                sent_by_name=inv.sended_by_user.c_full_name
+                if inv.sended_by_user
+                else None,
                 sent_by_email=inv.sended_by_user.email if inv.sended_by_user else None,
-                claimed_by_name=inv.claimed_by_user.c_full_name if inv.claimed_by_user else None,
-                claimed_by_email=inv.claimed_by_user.email if inv.claimed_by_user else None,
+                claimed_by_name=inv.claimed_by_user.c_full_name
+                if inv.claimed_by_user
+                else None,
+                claimed_by_email=inv.claimed_by_user.email
+                if inv.claimed_by_user
+                else None,
             )
             for inv in invitations
         ]
@@ -171,18 +180,20 @@ class AdminService:
                 ActivityItem(
                     type="invitation_created",
                     description=f"Code d'invitation {inv.code} genere",
-                    actor_name=inv.sended_by_user.c_full_name if inv.sended_by_user else None,
+                    actor_name=inv.sended_by_user.c_full_name
+                    if inv.sended_by_user
+                    else None,
                     timestamp=inv.created_at,
-                )
+                ),
             )
             if inv.claimed_by_user:
                 activities.append(
                     ActivityItem(
                         type="member_joined",
-                        description=f"{inv.claimed_by_user.c_full_name or inv.claimed_by_user.email} a rejoint l'etablissement",
+                        description=f"{inv.claimed_by_user.c_full_name or inv.claimed_by_user.email} a rejoint l'etablissement",  # noqa: E501
                         target_name=inv.claimed_by_user.c_full_name,
                         timestamp=inv.updated_at,
-                    )
+                    ),
                 )
 
         # Deduplication + tri

@@ -123,13 +123,12 @@ class InvitationRepository(BaseRepository[Invitation]):
 
         """
         async with async_session_local() as session:
-            stmt = (
-                select(
-                    func.count().label("total"),
-                    func.count(case((self.model.status == InviteStatus.PENDING, 1))).label("pending"),
-                )
-                .where(self.model.tenant_id == tenant_id)
-            )
+            stmt = select(
+                func.count().label("total"),
+                func.count(case((self.model.status == InviteStatus.PENDING, 1))).label(
+                    "pending",
+                ),
+            ).where(self.model.tenant_id == tenant_id)
             result = await session.execute(stmt)
             row = result.one()
             return {"total": row.total, "pending": row.pending}

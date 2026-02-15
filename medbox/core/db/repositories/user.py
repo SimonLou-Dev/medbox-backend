@@ -140,16 +140,21 @@ class UserRepository(BaseRepository[User]):
 
         """
         async with async_session_local() as session:
-            stmt = (
-                select(
-                    func.count().label("total"),
-                    func.count(case((self.model.role == UserRoles.TENANT_ADMIN, 1))).label("admin_count"),
-                    func.count(case((self.model.role == UserRoles.CAREGIVER, 1))).label("caregiver_count"),
-                    func.count(case((self.model.role == UserRoles.PATIENT, 1))).label("patient_role_count"),
-                    func.count(case((self.model.role == UserRoles.DEFAULT, 1))).label("default_count"),
-                )
-                .where(self.model.tenant_id == tenant_id)
-            )
+            stmt = select(
+                func.count().label("total"),
+                func.count(case((self.model.role == UserRoles.TENANT_ADMIN, 1))).label(
+                    "admin_count",
+                ),
+                func.count(case((self.model.role == UserRoles.CAREGIVER, 1))).label(
+                    "caregiver_count",
+                ),
+                func.count(case((self.model.role == UserRoles.PATIENT, 1))).label(
+                    "patient_role_count",
+                ),
+                func.count(case((self.model.role == UserRoles.DEFAULT, 1))).label(
+                    "default_count",
+                ),
+            ).where(self.model.tenant_id == tenant_id)
             result = await session.execute(stmt)
             row = result.one()
             return {
