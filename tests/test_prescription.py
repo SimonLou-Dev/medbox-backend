@@ -26,7 +26,7 @@ pytestmark = pytest.mark.asyncio
 # ==============================================================================
 
 
-async def _setup_tenant_patient(db_session: AsyncSession):
+async def _setup_tenant_patient(db_session: AsyncSession) -> tuple[Tenant, Patient]:
     """Create a tenant and patient for tests."""
     tenant = Tenant(id=uuid4(), name="Test Tenant")
     db_session.add(tenant)
@@ -44,7 +44,7 @@ async def _setup_tenant_patient(db_session: AsyncSession):
     return tenant, patient
 
 
-def _make_svc(tenant_id):
+def _make_svc(tenant_id: str) -> PrescriptionService:
     """Create a PrescriptionService with mocked S3 client."""
     return PrescriptionService(tenant_id=tenant_id, s3_client=AsyncMock())
 
@@ -55,7 +55,7 @@ def _item(
     dose_unit: str = "mg",
     pattern: str = "3x/jour",
     times_per_day: int | None = 3,
-):
+) -> PrescriptionItemRequest:
     """Shorthand to create an item request."""
     return PrescriptionItemRequest(
         medication_cis=None,
@@ -68,7 +68,7 @@ def _item(
     )
 
 
-def _req(patient_id, **kwargs):
+def _req(patient_id: str, **kwargs: any) -> PrescriptionRequest:
     """Shorthand to create a PrescriptionRequest with defaults."""
     defaults = {
         "patient_id": patient_id,
@@ -90,14 +90,17 @@ class TestPrescriptionCRUD:
     """Tests for prescription CRUD operations."""
 
     async def test_create_and_get(self, db_session: AsyncSession) -> None:
+        """Test creating a prescription and retrieving it."""
         tenant, patient = await _setup_tenant_patient(db_session)
         svc = _make_svc(tenant.id)
 
-        created = await svc.create(_req(
-            patient.id,
-            title="Ordonnance 1",
-            status="active",
-        ))
+        created = await svc.create(
+            _req(
+                patient.id,
+                title="Ordonnance 1",
+                status="active",
+            ),
+        )
 
         assert created.title == "Ordonnance 1"
         assert created.status == "active"
@@ -115,17 +118,20 @@ class TestPrescriptionCRUD:
         assert len(retrieved.items) == 1
 
     async def test_create_multiple_items(self, db_session: AsyncSession) -> None:
+        """Test creating a prescription with various configurations."""
         tenant, patient = await _setup_tenant_patient(db_session)
         svc = _make_svc(tenant.id)
 
-        created = await svc.create(_req(
-            patient.id,
-            items=[
-                _item("Med A", 100, "mg", "1x/jour", 1),
-                _item("Med B", None, "mg", "si besoin", None),
-                _item("Med C", 1, "cp", "matin+soir", 2),
-            ],
-        ))
+        created = await svc.create(
+            _req(
+                patient.id,
+                items=[
+                    _item("Med A", 100, "mg", "1x/jour", 1),
+                    _item("Med B", None, "mg", "si besoin", None),
+                    _item("Med C", 1, "cp", "matin+soir", 2),
+                ],
+            ),
+        )
 
         assert len(created.items) == 3
         labels = {i.medication_label for i in created.items}
@@ -154,7 +160,10 @@ class TestPrescriptionCRUD:
         assert result["total"] == 3
         assert len(result["items"]) == 3
 
-    async def test_list_by_patient_status_filter(self, db_session: AsyncSession) -> None:
+    async def test_list_by_patient_status_filter(
+        self,
+        db_session: AsyncSession,
+    ) -> None:
         tenant, patient = await _setup_tenant_patient(db_session)
         svc = _make_svc(tenant.id)
 
@@ -195,7 +204,10 @@ class TestPrescriptionCRUD:
 
         created = await svc.create(_req(patient.id, title="Test"))
 
-        updated = await svc.update_status(created.id, StatusUpdateRequest(status="stopped"))
+        updated = await svc.update_status(
+            created.id,
+            StatusUpdateRequest(status="stopped"),
+        )
         assert updated.status == "stopped"
         assert updated.title == "Test"  # rest unchanged
 
@@ -272,10 +284,12 @@ class TestItemManagement:
         tenant, patient = await _setup_tenant_patient(db_session)
         svc = _make_svc(tenant.id)
 
-        rx = await svc.create(_req(
-            patient.id,
-            items=[_item("Med 1"), _item("Med 2")],
-        ))
+        rx = await svc.create(
+            _req(
+                patient.id,
+                items=[_item("Med 1"), _item("Med 2")],
+            ),
+        )
         item_to_delete = rx.items[0].id
 
         updated = await svc.delete_item(rx.id, item_to_delete)
@@ -296,10 +310,12 @@ class TestItemManagement:
         tenant, patient = await _setup_tenant_patient(db_session)
         svc = _make_svc(tenant.id)
 
-        rx = await svc.create(_req(
-            patient.id,
-            items=[_item("Med A"), _item("Med B")],
-        ))
+        rx = await svc.create(
+            _req(
+                patient.id,
+                items=[_item("Med A"), _item("Med B")],
+            ),
+        )
         item_id = rx.items[1].id
 
         item = await svc.get_item(rx.id, item_id)
@@ -328,7 +344,9 @@ class TestDocumentHandling:
         tenant, patient = await _setup_tenant_patient(db_session)
         mock_s3 = AsyncMock()
         mock_s3.upload_file.return_value = "test-key"
-        mock_s3.build_s3_key = MagicMock(return_value="tenant/prescriptions/rx/ordonnance.pdf")
+        mock_s3.build_s3_key = MagicMock(
+            return_value="tenant/prescriptions/rx/ordonnance.pdf",
+        )
         svc = PrescriptionService(tenant_id=tenant.id, s3_client=mock_s3)
 
         rx = await svc.create(_req(patient.id))
@@ -347,7 +365,9 @@ class TestDocumentHandling:
         tenant, patient = await _setup_tenant_patient(db_session)
         mock_s3 = AsyncMock()
         mock_s3.upload_file.return_value = "test-key"
-        mock_s3.build_s3_key = MagicMock(return_value="tenant/prescriptions/rx/ordonnance.pdf")
+        mock_s3.build_s3_key = MagicMock(
+            return_value="tenant/prescriptions/rx/ordonnance.pdf",
+        )
         mock_s3.generate_presigned_url.return_value = "https://s3.example.com/presigned"
         svc = PrescriptionService(tenant_id=tenant.id, s3_client=mock_s3)
 
@@ -368,7 +388,9 @@ class TestDocumentHandling:
         tenant, patient = await _setup_tenant_patient(db_session)
         mock_s3 = AsyncMock()
         mock_s3.upload_file.return_value = "test-key"
-        mock_s3.build_s3_key = MagicMock(return_value="tenant/prescriptions/rx/ordonnance.pdf")
+        mock_s3.build_s3_key = MagicMock(
+            return_value="tenant/prescriptions/rx/ordonnance.pdf",
+        )
         mock_s3.delete_file.return_value = True
         svc = PrescriptionService(tenant_id=tenant.id, s3_client=mock_s3)
 
