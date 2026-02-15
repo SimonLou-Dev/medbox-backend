@@ -75,3 +75,45 @@ class RefreshTokenRequest(BaseModel):
     """Requête de rafraîchissement de token."""
 
     refresh_token: str | None = Field(None, description="Refresh token à utiliser")
+
+
+class DirectLoginRequest(BaseModel):
+    """Requête de connexion directe (username/password)."""
+
+    username: str = Field(..., min_length=1, description="Nom d'utilisateur ou email")
+    password: str = Field(..., min_length=1, description="Mot de passe")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "username": "john.doe",
+                    "password": "securepassword",
+                },
+            ],
+        },
+    }
+
+
+class RegisterRequest(BaseModel):
+    """Requête d'inscription d'un nouvel utilisateur."""
+
+    username: str = Field(..., min_length=3, max_length=50, description="Nom d'utilisateur")
+    email: EmailStr = Field(..., description="Adresse email")
+    password: str = Field(..., min_length=8, description="Mot de passe (8 caractères minimum)")
+    first_name: str = Field(..., min_length=1, max_length=100, description="Prénom")
+    last_name: str = Field(..., min_length=1, max_length=100, description="Nom de famille")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "username": "john.doe",
+                    "email": "john.doe@example.com",
+                    "password": "securepassword",
+                    "first_name": "John",
+                    "last_name": "Doe",
+                },
+            ],
+        },
+    }

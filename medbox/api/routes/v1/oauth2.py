@@ -8,7 +8,7 @@ from fastapi import APIRouter, Cookie, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from medbox.core.config.settings import settings
-from medbox.core.dto.auth import MeResponse
+from medbox.core.dto.auth import DirectLoginRequest, MeResponse, RegisterRequest
 from medbox.core.services import CurrentUser, SecuritySvcDep, UserSvcDep
 
 router = APIRouter(prefix="/oauth2", tags=["OAuth2"])
@@ -92,6 +92,87 @@ async def callback(
         response = Response(status_code=status.HTTP_204_NO_CONTENT)
 
     # Configurer les cookies d'authentification
+    _set_auth_cookies(response, access_token, refresh_token or "", id_token or "")
+
+    return response
+
+
+@router.post("/direct-login")
+async def direct_login(
+    body: DirectLoginRequest,
+    security: SecuritySvcDep,
+    user_service: UserSvcDep,
+) -> Response:
+    """Connexion directe via username/password.
+
+    Authentifie l'utilisateur via le Resource Owner Password Credentials flow
+    de Keycloak et retourne les tokens dans des cookies HTTP-only.
+
+    Args:
+        body: Username et password
+        security: Service de gestion de l'auth
+        user_service: Service de gestion de l'utilisateur
+
+    Returns:
+        204 avec cookies d'authentification
+
+    """
+    # Authentification via Keycloak
+    ctx, access_token, refresh_token, id_token = await security.authenticate_with_password(
+        username=body.username,
+        password=body.password,
+    )
+
+    # Synchro utilisateur en DB (identique au callback OAuth2)
+    await user_service.sync_user_from_identity_provider(ctx)
+
+    # Réponse avec cookies
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    _set_auth_cookies(response, access_token, refresh_token or "", id_token or "")
+
+    return response
+
+
+@router.post("/register")
+async def register(
+    body: RegisterRequest,
+    security: SecuritySvcDep,
+    user_service: UserSvcDep,
+) -> Response:
+    """Inscription d'un nouvel utilisateur.
+
+    Crée l'utilisateur dans Keycloak via l'Admin API, puis l'authentifie
+    automatiquement et synchronise les données en base.
+
+    Args:
+        body: Données d'inscription
+        security: Service de gestion de l'auth
+        user_service: Service de gestion de l'utilisateur
+
+    Returns:
+        204 avec cookies d'authentification
+
+    """
+    # 1. Créer l'utilisateur dans Keycloak
+    await security.register_user(
+        email=body.email,
+        password=body.password,
+        first_name=body.first_name,
+        last_name=body.last_name,
+        username=body.username,
+    )
+
+    # 2. Authentifier automatiquement le nouvel utilisateur
+    ctx, access_token, refresh_token, id_token = await security.authenticate_with_password(
+        username=body.username,
+        password=body.password,
+    )
+
+    # 3. Synchro en DB (crée le user avec status=PENDING, role=DEFAULT, tenant_id=NULL)
+    await user_service.sync_user_from_identity_provider(ctx)
+
+    # 4. Réponse avec cookies
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
     _set_auth_cookies(response, access_token, refresh_token or "", id_token or "")
 
     return response

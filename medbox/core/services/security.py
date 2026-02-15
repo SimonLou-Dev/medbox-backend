@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timedelta
 from typing import Annotated, Any
 
@@ -15,6 +16,8 @@ from fastapi.security.utils import get_authorization_scheme_param
 from pydantic import BaseModel
 
 from medbox.core.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 # ==============================================================================
 # OAuth2 Scheme
@@ -259,6 +262,145 @@ class SecurityService:
             tokens.get("refresh_token"),
             tokens.get("id_token"),
         )
+
+    async def authenticate_with_password(
+        self,
+        username: str,
+        password: str,
+    ) -> tuple[LightWeightUserContext, str, str | None, str | None]:
+        """Authentifie un utilisateur via username/password (Resource Owner Password Credentials).
+
+        Args:
+            username: Le nom d'utilisateur ou l'email
+            password: Le mot de passe
+
+        Returns:
+            Tuple contenant (UserContext, access_token, refresh_token, id_token)
+
+        Raises:
+            HTTPException: Si les identifiants sont invalides
+
+        """
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                self.token_endpoint,
+                data={
+                    "grant_type": "password",
+                    "client_id": settings.keycloak_client_id,
+                    "client_secret": settings.keycloak_client_secret,
+                    "username": username,
+                    "password": password,
+                    "scope": "openid profile email",
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+
+        if response.status_code != status.HTTP_200_OK:
+            error_data = response.json()
+            error_description = error_data.get("error_description", "Invalid credentials")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=error_description,
+            )
+
+        tokens = response.json()
+        claims = await self.decode_token(tokens["access_token"])
+        user_context = LightWeightUserContext(claims=claims)
+
+        return (
+            user_context,
+            tokens["access_token"],
+            tokens.get("refresh_token"),
+            tokens.get("id_token"),
+        )
+
+    async def register_user(
+        self,
+        *,
+        email: str,
+        password: str,
+        first_name: str,
+        last_name: str,
+        username: str,
+    ) -> None:
+        """Crée un utilisateur dans Keycloak via l'Admin REST API.
+
+        Utilise le service account du client pour obtenir un token admin,
+        puis crée l'utilisateur dans le realm.
+
+        Args:
+            email: Adresse email
+            password: Mot de passe
+            first_name: Prénom
+            last_name: Nom de famille
+            username: Nom d'utilisateur
+
+        Raises:
+            HTTPException: Si la création échoue (email/username déjà pris, etc.)
+
+        """
+        # 1. Obtenir un token admin via le service account (client_credentials)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            token_response = await client.post(
+                self.token_endpoint,
+                data={
+                    "grant_type": "client_credentials",
+                    "client_id": settings.keycloak_client_id,
+                    "client_secret": settings.keycloak_client_secret,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+
+        if token_response.status_code != status.HTTP_200_OK:
+            logger.error("Failed to get admin token: %s", token_response.text)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Unable to connect to identity provider",
+            )
+
+        admin_token = token_response.json()["access_token"]
+
+        # 2. Créer l'utilisateur via l'Admin REST API
+        admin_url = f"{settings.keycloak_url}/admin/realms/{settings.keycloak_realm}/users"
+
+        user_payload = {
+            "username": username,
+            "email": email,
+            "firstName": first_name,
+            "lastName": last_name,
+            "enabled": True,
+            "emailVerified": True,
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": password,
+                    "temporary": False,
+                },
+            ],
+        }
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            create_response = await client.post(
+                admin_url,
+                json=user_payload,
+                headers={
+                    "Authorization": f"Bearer {admin_token}",
+                    "Content-Type": "application/json",
+                },
+            )
+
+        if create_response.status_code == 409:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Un utilisateur avec cet email ou ce nom d'utilisateur existe deja",
+            )
+
+        if create_response.status_code not in (201, 204):
+            logger.error("Failed to create user in Keycloak: %s", create_response.text)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Erreur lors de la creation du compte",
+            )
 
     async def refresh_token(self, refresh_token: str) -> TokenResponse:
         """Rafraîchit un access token à partir d'un refresh token.
