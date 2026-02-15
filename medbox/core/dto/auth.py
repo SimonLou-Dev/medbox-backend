@@ -117,3 +117,18 @@ class RegisterRequest(BaseModel):
             ],
         },
     }
+
+
+class UpdateProfileRequest(BaseModel):
+    """Requête de mise à jour du profil utilisateur."""
+
+    first_name: str | None = Field(None, max_length=100, description="Prénom")
+    last_name: str | None = Field(None, max_length=100, description="Nom de famille")
+    email: EmailStr | None = Field(None, description="Adresse email")
+
+
+class ChangePasswordRequest(BaseModel):
+    """Requête de changement de mot de passe."""
+
+    current_password: str = Field(..., min_length=1, description="Mot de passe actuel")
+    new_password: str = Field(..., min_length=8, description="Nouveau mot de passe (8 caractères minimum)")

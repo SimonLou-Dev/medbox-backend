@@ -8,7 +8,13 @@ from fastapi import APIRouter, Cookie, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from medbox.core.config.settings import settings
-from medbox.core.dto.auth import DirectLoginRequest, MeResponse, RegisterRequest
+from medbox.core.dto.auth import (
+    ChangePasswordRequest,
+    DirectLoginRequest,
+    MeResponse,
+    RegisterRequest,
+    UpdateProfileRequest,
+)
 from medbox.core.services import CurrentUser, SecuritySvcDep, UserSvcDep
 
 router = APIRouter(prefix="/oauth2", tags=["OAuth2"])
@@ -303,6 +309,85 @@ async def logout(
     response.delete_cookie("csrf_token", secure=True, samesite="none")
 
     return response
+
+
+@router.put("/profile")
+async def update_profile(
+    body: UpdateProfileRequest,
+    user: CurrentUser,
+    security: SecuritySvcDep,
+    user_service: UserSvcDep,
+) -> Response:
+    """Met à jour le profil de l'utilisateur connecté.
+
+    Modifie le prénom, nom et/ou email dans Keycloak, puis
+    re-synchronise les données en base.
+
+    Args:
+        body: Champs à modifier
+        user: Contexte de l'utilisateur connecté
+        security: Service de sécurité
+        user_service: Service utilisateur
+
+    Returns:
+        204 No Content
+
+    """
+    await security.update_user_profile(
+        subject=user.subject,
+        first_name=body.first_name,
+        last_name=body.last_name,
+        email=body.email,
+    )
+
+    # Re-sync en DB avec les nouvelles données Keycloak
+    # On re-construit le full_name à partir des champs fournis ou existants
+    new_full_name = user.full_name
+    if body.first_name is not None or body.last_name is not None:
+        given = body.first_name if body.first_name is not None else user.claims.get("given_name", "")
+        family = body.last_name if body.last_name is not None else user.claims.get("family_name", "")
+        new_full_name = f"{given} {family.upper()}".strip()
+
+    new_email = body.email if body.email is not None else user.email
+
+    await user_service.user_repo.update_or_create(
+        filters={"keycloak_subject": user.subject},
+        defaults={
+            "email": new_email,
+            "c_full_name": new_full_name,
+        },
+    )
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put("/password")
+async def change_password(
+    body: ChangePasswordRequest,
+    user: CurrentUser,
+    security: SecuritySvcDep,
+) -> Response:
+    """Change le mot de passe de l'utilisateur connecté.
+
+    Vérifie d'abord l'ancien mot de passe avant d'appliquer le nouveau.
+
+    Args:
+        body: Ancien et nouveau mot de passe
+        user: Contexte de l'utilisateur connecté
+        security: Service de sécurité
+
+    Returns:
+        204 No Content
+
+    """
+    await security.change_user_password(
+        subject=user.subject,
+        username=user.username,
+        current_password=body.current_password,
+        new_password=body.new_password,
+    )
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/me", response_model=MeResponse)

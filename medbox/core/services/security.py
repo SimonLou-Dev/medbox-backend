@@ -314,6 +314,75 @@ class SecurityService:
             tokens.get("id_token"),
         )
 
+    # --------------------------------------------------------------------------
+    # Keycloak Admin API Helpers
+    # --------------------------------------------------------------------------
+
+    async def _get_admin_token(self) -> str:
+        """Obtient un token admin via le service account (client_credentials).
+
+        Returns:
+            Le token d'accès admin
+
+        Raises:
+            HTTPException: Si l'obtention du token échoue
+
+        """
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            token_response = await client.post(
+                self.token_endpoint,
+                data={
+                    "grant_type": "client_credentials",
+                    "client_id": settings.keycloak_client_id,
+                    "client_secret": settings.keycloak_client_secret,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+
+        if token_response.status_code != status.HTTP_200_OK:
+            logger.error("Failed to get admin token: %s", token_response.text)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Unable to connect to identity provider",
+            )
+
+        return token_response.json()["access_token"]
+
+    async def _get_keycloak_user_id(self, admin_token: str, subject: str) -> str:
+        """Récupère l'ID Keycloak d'un utilisateur via son subject (sub).
+
+        Args:
+            admin_token: Token admin pour l'API
+            subject: Le subject (sub) du JWT de l'utilisateur
+
+        Returns:
+            L'ID Keycloak de l'utilisateur
+
+        Raises:
+            HTTPException: Si l'utilisateur n'est pas trouvé
+
+        """
+        admin_url = f"{settings.keycloak_url}/admin/realms/{settings.keycloak_realm}/users/{subject}"
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                admin_url,
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+
+        if response.status_code != status.HTTP_200_OK:
+            logger.error("Failed to get Keycloak user %s: %s", subject, response.text)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Utilisateur non trouve dans Keycloak",
+            )
+
+        return response.json()["id"]
+
+    # --------------------------------------------------------------------------
+    # Keycloak Admin API Operations
+    # --------------------------------------------------------------------------
+
     async def register_user(
         self,
         *,
@@ -339,28 +408,8 @@ class SecurityService:
             HTTPException: Si la création échoue (email/username déjà pris, etc.)
 
         """
-        # 1. Obtenir un token admin via le service account (client_credentials)
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            token_response = await client.post(
-                self.token_endpoint,
-                data={
-                    "grant_type": "client_credentials",
-                    "client_id": settings.keycloak_client_id,
-                    "client_secret": settings.keycloak_client_secret,
-                },
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
+        admin_token = await self._get_admin_token()
 
-        if token_response.status_code != status.HTTP_200_OK:
-            logger.error("Failed to get admin token: %s", token_response.text)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Unable to connect to identity provider",
-            )
-
-        admin_token = token_response.json()["access_token"]
-
-        # 2. Créer l'utilisateur via l'Admin REST API
         admin_url = f"{settings.keycloak_url}/admin/realms/{settings.keycloak_realm}/users"
 
         user_payload = {
@@ -400,6 +449,131 @@ class SecurityService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Erreur lors de la creation du compte",
+            )
+
+    async def update_user_profile(
+        self,
+        *,
+        subject: str,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        email: str | None = None,
+    ) -> None:
+        """Met à jour le profil d'un utilisateur dans Keycloak.
+
+        Args:
+            subject: Le subject (sub) JWT de l'utilisateur
+            first_name: Nouveau prénom (optionnel)
+            last_name: Nouveau nom (optionnel)
+            email: Nouvel email (optionnel)
+
+        Raises:
+            HTTPException: Si la mise à jour échoue
+
+        """
+        admin_token = await self._get_admin_token()
+        keycloak_id = await self._get_keycloak_user_id(admin_token, subject)
+
+        # Construire le payload avec uniquement les champs fournis
+        payload: dict[str, Any] = {}
+        if first_name is not None:
+            payload["firstName"] = first_name
+        if last_name is not None:
+            payload["lastName"] = last_name
+        if email is not None:
+            payload["email"] = email
+            payload["emailVerified"] = True
+
+        if not payload:
+            return  # Rien à mettre à jour
+
+        admin_url = f"{settings.keycloak_url}/admin/realms/{settings.keycloak_realm}/users/{keycloak_id}"
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.put(
+                admin_url,
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {admin_token}",
+                    "Content-Type": "application/json",
+                },
+            )
+
+        if response.status_code == 409:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Un utilisateur avec cet email existe deja",
+            )
+
+        if response.status_code not in (200, 204):
+            logger.error("Failed to update user profile in Keycloak: %s", response.text)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Erreur lors de la mise a jour du profil",
+            )
+
+    async def change_user_password(
+        self,
+        *,
+        subject: str,
+        username: str,
+        current_password: str,
+        new_password: str,
+    ) -> None:
+        """Change le mot de passe d'un utilisateur dans Keycloak.
+
+        Vérifie d'abord l'ancien mot de passe puis applique le nouveau.
+
+        Args:
+            subject: Le subject (sub) JWT de l'utilisateur
+            username: Le nom d'utilisateur (pour vérifier l'ancien mdp)
+            current_password: Mot de passe actuel
+            new_password: Nouveau mot de passe
+
+        Raises:
+            HTTPException: Si l'ancien mdp est incorrect ou si la mise à jour échoue
+
+        """
+        # 1. Vérifier l'ancien mot de passe
+        try:
+            await self.authenticate_with_password(
+                username=username,
+                password=current_password,
+            )
+        except HTTPException:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Mot de passe actuel incorrect",
+            )
+
+        # 2. Changer le mot de passe via l'Admin API
+        admin_token = await self._get_admin_token()
+        keycloak_id = await self._get_keycloak_user_id(admin_token, subject)
+
+        admin_url = (
+            f"{settings.keycloak_url}/admin/realms/{settings.keycloak_realm}"
+            f"/users/{keycloak_id}/reset-password"
+        )
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.put(
+                admin_url,
+                json={
+                    "type": "password",
+                    "value": new_password,
+                    "temporary": False,
+                },
+                headers={
+                    "Authorization": f"Bearer {admin_token}",
+                    "Content-Type": "application/json",
+                },
+            )
+
+        if response.status_code not in (200, 204):
+            logger.error("Failed to change password in Keycloak: %s", response.text)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Erreur lors du changement de mot de passe",
             )
 
     async def refresh_token(self, refresh_token: str) -> TokenResponse:
