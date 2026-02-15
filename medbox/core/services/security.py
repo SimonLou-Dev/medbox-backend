@@ -85,7 +85,7 @@ class TokenResponse(BaseModel):
 
     access_token: str
     refresh_token: str | None = None
-    token_type: str = "Bearer"  # noqa: S105
+    token_type: str = "Bearer"
     expires_in: int | None = None
 
 
@@ -297,7 +297,9 @@ class SecurityService:
 
         if response.status_code != status.HTTP_200_OK:
             error_data = response.json()
-            error_description = error_data.get("error_description", "Invalid credentials")
+            error_description = error_data.get(
+                "error_description", "Invalid credentials"
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=error_description,
@@ -410,7 +412,9 @@ class SecurityService:
         """
         admin_token = await self._get_admin_token()
 
-        admin_url = f"{settings.keycloak_url}/admin/realms/{settings.keycloak_realm}/users"
+        admin_url = (
+            f"{settings.keycloak_url}/admin/realms/{settings.keycloak_realm}/users"
+        )
 
         user_payload = {
             "username": username,
@@ -540,11 +544,11 @@ class SecurityService:
                 username=username,
                 password=current_password,
             )
-        except HTTPException:
+        except HTTPException as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Mot de passe actuel incorrect",
-            )
+            ) from e
 
         # 2. Changer le mot de passe via l'Admin API
         admin_token = await self._get_admin_token()
