@@ -101,7 +101,16 @@ app.add_middleware(
 )
 
 # 2. CSRFMiddleware
-app.add_middleware(CSRFMiddleware, allowed_origins=set(allowed_origins))
+app.add_middleware(
+    CSRFMiddleware,
+    allowed_origins=set(allowed_origins),
+    exclude_prefixes=(
+        "/docs",
+        "/openapi.json",
+        "/v1/oauth2/direct-login",
+        "/v1/oauth2/register",
+    ),
+)
 
 # 3. CORSMiddleware (outermost — added last)
 app.add_middleware(
