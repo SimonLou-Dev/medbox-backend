@@ -60,6 +60,7 @@ class Box(Base, IDMixin, TimestampMixin):
     on_battery: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     tenant: Mapped[Tenant] = relationship(back_populates="boxes")
     patient: Mapped[Patient | None] = relationship(back_populates="boxes")

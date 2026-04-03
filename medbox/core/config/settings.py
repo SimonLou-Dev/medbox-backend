@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     app_url: str = Field(alias="APP_URL", default="http://localhost:8000")
     url_prefix: str | None = Field(alias="URL_PREFIX", default=None)
 
+    # --- EMQX / MQTT ---
+    emqx_host: str = Field(default="localhost", alias="EMQX_HOST")
+    emqx_port: int = Field(default=8883, alias="EMQX_PORT")
+    emqx_ca_cert: str = Field(default="/app/certs/ca.crt", alias="EMQX_CA_CERT")
+    emqx_client_cert: str = Field(default="/app/certs/worker.crt", alias="EMQX_CLIENT_CERT")
+    emqx_client_key: str = Field(default="/app/certs/worker.key", alias="EMQX_CLIENT_KEY")
+
     # --- Misc ---
     environment: str = "development"
 

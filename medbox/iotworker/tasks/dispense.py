@@ -61,16 +61,37 @@ def send_dispense_command(
             )
             return {"status": "skipped", "reason": "item_not_found"}
 
-        # TODO: publier le message MQTT
-        # topic = f"medbox/box/{box_uid}/cmd/dispense"
-        # payload = {"schedule_item_id": schedule_item_id, "prescription_item_id": prescription_item_id}
-        # await mqtt_client.publish(topic, payload, qos=2)
-        logger.info(
-            "Commande dispense envoyée → box=%s item=%s",
-            box_uid,
-            schedule_item_id,
+        # Publier la commande sur MQTT
+        import json
+        import ssl
+
+        import aiomqtt
+
+        from medbox.core.config.settings import settings
+
+        topic = f"medbox/box/{box_uid}/cmd/dispense"
+        msg = json.dumps({
+            "schedule_item_id": schedule_item_id,
+            "prescription_item_id": prescription_item_id,
+        })
+
+        tls_ctx = ssl.create_default_context(
+            ssl.Purpose.SERVER_AUTH,
+            cafile=settings.emqx_ca_cert,
+        )
+        tls_ctx.load_cert_chain(
+            certfile=settings.emqx_client_cert,
+            keyfile=settings.emqx_client_key,
         )
 
+        async with aiomqtt.Client(
+            hostname=settings.emqx_host,
+            port=settings.emqx_port,
+            tls_context=tls_ctx,
+        ) as mqtt:
+            await mqtt.publish(topic, payload=msg, qos=2)
+
+        logger.info("Commande dispense envoyée → box=%s item=%s", box_uid, schedule_item_id)
         return {"status": "dispatched", "box_uid": box_uid, "item_id": schedule_item_id}
 
     try:

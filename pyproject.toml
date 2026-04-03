@@ -47,6 +47,7 @@ tenacity = "8.2.3"
 celery = {version = ">=5.4.0", extras = ["redis"]}
 aioboto3 = "^15.5.0"
 python-multipart = "^0.0.22"
+aiomqtt = "^2.5.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
