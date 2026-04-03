@@ -119,9 +119,9 @@ class TenantInvitationService:
 
         invite = await self.invite_repo.add(invite)
 
-        expire_invitation.send_with_options(
+        expire_invitation.apply_async(
             args=[str(invite.id)],
-            delay=600_000,  # 10 min en ms
+            countdown=600,  # 10 minutes en secondes
         )
 
         return invite
@@ -190,7 +190,10 @@ class TenantInvitationService:
                 detail="L'invitation n'est plus valide",
             )
 
-        if invitation.expires_at < datetime.now(tz=UTC):
+        expires_at = invitation.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        if expires_at < datetime.now(tz=UTC):
             raise HTTPException(
                 status_code=400,
                 detail="L'invitation a expiré",

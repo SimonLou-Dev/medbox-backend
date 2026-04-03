@@ -1,17 +1,16 @@
-"""Dramatiq tasks for synchronizing medications from French BDPM API."""
+"""Tâche Celery de synchronisation des médicaments depuis l'API BDPM française."""
 
 import asyncio
 import logging
 from datetime import datetime
 
-import dramatiq
 import httpx
 
+from medbox.core.celery_app import celery_app
 from medbox.core.db.models.global_medication import GlobalMedication
 from medbox.core.db.repositories.global_medication import GlobalMedicationRepository
 from medbox.core.filters import is_medbox_1_compatible
 from medbox.core.utils.redis_lock import get_task_lock
-from medbox.schedulerworker import broker  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -20,18 +19,19 @@ EXTERNAL_API_BASE_URL = "https://medicaments-api.giygas.dev"
 API_TIMEOUT = 120.0  # 60 seconds for large database download
 
 
-@dramatiq.actor(max_retries=2)
+@celery_app.task(
+    name="medbox.core.tasks.medication_sync.sync_medications_from_api",
+    queue="default",
+    max_retries=2,
+)
 def sync_medications_from_api() -> dict:
-    """Sync all medications from French BDPM API database.
+    """Synchronise les médicaments depuis l'API BDPM française.
 
-    Dramatiq task that fetches the complete database from the external API
-    and updates the local global_medications table.
-
-    This task uses a Redis lock to ensure only one instance runs at a time
-    across all API instances, with a 1-hour rate limit.
+    Tâche Celery planifiée quotidiennement à 03:00 UTC via Celery Beat.
+    Utilise un verrou Redis pour éviter les exécutions concurrentes.
 
     Returns:
-        dict: Sync result with counts (total, inserted, errors)
+        dict: Résultat avec compteurs (total, inserted, updated, errors)
 
     """
     # Acquire distributed lock with 1-hour rate limit

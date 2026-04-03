@@ -44,10 +44,7 @@ tenacity = "8.2.3"
 
 
 # Task Queue
-dramatiq = "2.0.1"
-apscheduler = "^3.10.4"
-dramatiq-crontab = "^1.0.12"
-jaraco-context = "^6.1.0"
+celery = {version = ">=5.4.0", extras = ["redis"]}
 aioboto3 = "^15.5.0"
 python-multipart = "^0.0.22"
 

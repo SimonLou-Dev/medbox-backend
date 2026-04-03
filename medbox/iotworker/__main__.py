@@ -1,10 +1,23 @@
-# medbox/schedulerworker/__main__.py
+"""Entrée CLI : démarre le worker Celery IoT."""
 
 import subprocess
 
 
-def run():
+def run() -> None:
+    """Lance celery worker sur la queue 'iot'."""
     subprocess.run(  # noqa: S603
-        ["dramatiq", "medbox.schedulerworker.main"],  # noqa: S607
+        [  # noqa: S607
+            "celery",
+            "-A", "medbox.iotworker.broker",
+            "worker",
+            "--loglevel=info",
+            "-Q", "iot",
+            "-c", "4",
+            "-n", "iot@%h",
+        ],
         check=True,
     )
+
+
+if __name__ == "__main__":
+    run()

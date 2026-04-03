@@ -1,38 +1,10 @@
-"""Dramatiq broker configuration."""
+"""Point d'entrée Celery pour le Scheduler Worker.
 
-import logging
+Le Scheduler Worker consomme la queue 'scheduler'.
+Celery Beat tourne en parallèle pour déclencher les tâches périodiques.
 
-import dramatiq
-from dramatiq.brokers.redis import RedisBroker
-from dramatiq.middleware import AsyncIO
+Lancement worker  : celery -A medbox.schedulerworker.broker_config worker -Q scheduler -c 2
+Lancement beat    : celery -A medbox.schedulerworker.broker_config beat --loglevel=info
+"""
 
-from medbox.core.config.settings import settings
-
-logger = logging.getLogger(__name__)
-
-
-def configure_broker() -> RedisBroker:
-    """Configure and initialize the Dramatiq Redis broker.
-
-    Returns:
-        RedisBroker: Configured broker instance
-
-    """
-    # Create Redis broker
-    broker = RedisBroker(url=settings.redis_url)
-
-    # Add middleware
-    broker.add_middleware(AsyncIO())
-
-    # Set as global broker
-    dramatiq.set_broker(broker)
-
-    logger.info("✅ Dramatiq broker configured with Redis")
-
-    return broker
-
-
-# Initialize broker at module import
-broker = configure_broker()
-
-# medbox/schedulerworker/broker_config.py
+from medbox.core.celery_app import celery_app  # noqa: F401 — expose l'app Celery

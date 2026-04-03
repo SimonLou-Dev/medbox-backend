@@ -1,9 +1,3 @@
-# medbox/schedulerworker/main.py
+"""Scheduler Worker — enregistre les tâches Celery de la queue 'scheduler'."""
 
-
-from medbox.core import tasks  # noqa: F401
-from medbox.schedulerworker import broker_config  # noqa: F401
-
-
-def run():
-    print("Scheduler worker started")  # noqa: T201
+from medbox.schedulerworker.tasks import cleanup, monitoring, scheduling  # noqa: F401

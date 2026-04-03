@@ -1,9 +1,7 @@
-import dramatiq
-from dramatiq.brokers.redis import RedisBroker
-from dramatiq.middleware import AgeLimit, Retries
+"""Point d'entrée Celery pour l'IoT Worker.
 
-broker = RedisBroker(url="redis://redis:6379")
-broker.add_middleware(Retries(max_retries=3))
-broker.add_middleware(AgeLimit(max_age=60_000))
+L'IoT Worker consomme exclusivement la queue 'iot'.
+Lancement : celery -A medbox.iotworker.broker worker -Q iot -c 4
+"""
 
-dramatiq.set_broker(broker)
+from medbox.core.celery_app import celery_app  # noqa: F401 — expose l'app Celery

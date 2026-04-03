@@ -21,7 +21,7 @@ services:
     networks:
       - medbox-network
 
-  # Redis for Dramatiq Task Queue
+  # Redis — broker Celery + result backend
   redis:
     image: redis:7-alpine
     container_name: medbox-redis
@@ -29,6 +29,7 @@ services:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
+    command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -44,17 +45,13 @@ services:
       dockerfile: Dockerfile.api
     container_name: medbox-api
     environment:
-      # Database
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-medbox}:${DB_PASSWORD:-medbox_password}@postgres:5432/${DB_NAME:-medbox_db}
-      # Redis
       REDIS_URL: redis://redis:6379
-      # Security
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
       KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8080}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-medbox}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-medbox-api}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-}
-      # Environment
       ENV: ${ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
@@ -71,18 +68,19 @@ services:
       - medbox-network
     restart: unless-stopped
 
-  # Scheduler Worker (APScheduler + Dramatiq Message Sender)
-  scheduler-worker:
+  # IoT Worker — Celery worker sur la queue 'iot'
+  # Reçoit les commandes de dispense et traite les événements MQTT
+  iot-worker:
     build:
       context: .
-      dockerfile: Dockerfile.scheduler-worker
-    container_name: medbox-scheduler-worker
+      dockerfile: Dockerfile.iotworker
+    container_name: medbox-iot-worker
+    command: >
+      celery -A medbox.iotworker.broker worker
+      --loglevel=info -Q iot -c 4 -n iot@%h
     environment:
-      # Database
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-medbox}:${DB_PASSWORD:-medbox_password}@postgres:5432/${DB_NAME:-medbox_db}
-      # Redis
       REDIS_URL: redis://redis:6379
-      # Environment
       ENV: ${ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
@@ -92,25 +90,23 @@ services:
         condition: service_healthy
     volumes:
       - ./medbox:/app/medbox
-      - ./migrations:/app/migrations
     networks:
       - medbox-network
     restart: unless-stopped
 
-  # Queue Worker (Dramatiq Task Executor)
-  queue-worker:
+  # Scheduler Worker — Celery worker sur la queue 'scheduler'
+  # Exécute les tâches planifiées : dispatch, monitoring, cleanup
+  scheduler-worker:
     build:
       context: .
-      dockerfile: Dockerfile.queue-worker
-    container_name: medbox-queue-worker
+      dockerfile: Dockerfile.worker
+    container_name: medbox-scheduler-worker
+    command: >
+      celery -A medbox.schedulerworker.broker_config worker
+      --loglevel=info -Q scheduler -c 2 -n scheduler@%h
     environment:
-      # Database
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-medbox}:${DB_PASSWORD:-medbox_password}@postgres:5432/${DB_NAME:-medbox_db}
-      # Redis
       REDIS_URL: redis://redis:6379
-      # External APIs
-      MEDICATIONS_API_URL: ${MEDICATIONS_API_URL:-https://medicaments-api.giygas.dev}
-      # Environment
       ENV: ${ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
@@ -120,7 +116,33 @@ services:
         condition: service_healthy
     volumes:
       - ./medbox:/app/medbox
-      - ./migrations:/app/migrations
+    networks:
+      - medbox-network
+    restart: unless-stopped
+
+  # Celery Beat — planificateur des tâches périodiques
+  # Un seul Beat doit tourner à la fois (singleton)
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: medbox-celery-beat
+    command: >
+      celery -A medbox.schedulerworker.broker_config beat
+      --loglevel=info --scheduler celery.beat.PersistentScheduler
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-medbox}:${DB_PASSWORD:-medbox_password}@postgres:5432/${DB_NAME:-medbox_db}
+      REDIS_URL: redis://redis:6379
+      ENV: ${ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./medbox:/app/medbox
+      - celerybeat_data:/app/celerybeat
     networks:
       - medbox-network
     restart: unless-stopped
@@ -128,6 +150,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  celerybeat_data:
 
 networks:
   medbox-network:

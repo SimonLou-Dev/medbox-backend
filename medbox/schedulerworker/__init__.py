@@ -1,3 +1,3 @@
-from medbox.schedulerworker.broker_config import broker
+from medbox.core.celery_app import celery_app
 
-__all__ = ["broker"]
+__all__ = ["celery_app"]

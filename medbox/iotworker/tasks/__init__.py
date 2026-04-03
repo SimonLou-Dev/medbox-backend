@@ -1,1 +1,1 @@
-from .test import test
+from . import dispense  # noqa: F401

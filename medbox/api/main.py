@@ -38,14 +38,14 @@ async def lifespan(app: FastAPI):
         logger.error("⚠️  Migration error: %s", e, exc_info=True)
         raise
 
-    logger.info("⏰ Initializing scheduler...")  # Inici c'es c&ssé
+    logger.info("⏰ Scheduler — synchronisation médicaments planifiée via Celery Beat")
     try:
         from medbox.core.tasks.medication_sync import sync_medications_from_api
 
-        await sync_medications_from_api.send()
-        logger.info("✅ Scheduler initialized (daily sync at 2 AM)")
+        sync_medications_from_api.delay()
+        logger.info("✅ Sync médicaments envoyée à la queue Celery")
     except Exception as e:
-        logger.warning("⚠️  Scheduler initialization warning: %s", e, exc_info=True)
+        logger.warning("⚠️  Impossible d'envoyer la tâche de sync : %s", e, exc_info=True)
 
     yield
 
