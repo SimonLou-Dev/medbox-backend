@@ -52,5 +52,8 @@ class Wheel(Base, IDMixin, TimestampMixin):
     tenant: Mapped[Tenant] = relationship(back_populates="wheels")
     patient: Mapped[Patient | None] = relationship(back_populates="wheels")
     box: Mapped[Box | None] = relationship(back_populates="wheels")
-    slots: Mapped[list[WheelSlot]] = relationship(back_populates="wheel")
+    slots: Mapped[list[WheelSlot]] = relationship(
+        back_populates="wheel",
+        passive_deletes=True,
+    )
     events: Mapped[list[Event]] = relationship(back_populates="wheel")
