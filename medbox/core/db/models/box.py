@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
@@ -25,9 +25,9 @@ class Box(Base, IDMixin, TimestampMixin):
 
     __tablename__ = "boxes"
 
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("tenants.id", ondelete="CASCADE"),
-        nullable=False,
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("tenants.id", ondelete="SET NULL"),
+        nullable=True,
     )
 
     # Identifiant physique (lecture sur la box, QR code, etc.)
@@ -48,17 +48,7 @@ class Box(Base, IDMixin, TimestampMixin):
     )
 
     firmware_version: Mapped[str | None] = mapped_column(String(50))
-    software_version: Mapped[str | None] = mapped_column(String(50))
-
     timezone: Mapped[str | None] = mapped_column(String(64))
-
-    battery_level: Mapped[int | None] = mapped_column(
-        Integer,
-        doc="Pourcentage 0-100",
-        nullable=True,
-    )
-    on_battery: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

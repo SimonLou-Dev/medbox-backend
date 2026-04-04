@@ -24,9 +24,9 @@ class Wheel(Base, IDMixin, TimestampMixin):
 
     __tablename__ = "wheels"
 
-    tenant_id: Mapped[UUID] = mapped_column(
-        ForeignKey("tenants.id", ondelete="CASCADE"),
-        nullable=False,
+    tenant_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("tenants.id", ondelete="SET NULL"),
+        nullable=True,
     )
 
     wheel_uid: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)

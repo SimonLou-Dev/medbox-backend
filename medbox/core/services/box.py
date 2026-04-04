@@ -8,7 +8,8 @@ from fastapi import HTTPException, status
 
 from medbox.core.db.models.box import Box
 from medbox.core.db.repositories.box import BoxRepository
-from medbox.core.dto.box import BoxRequest, BoxResponse, BoxStatusUpdateRequest
+from medbox.core.db.repositories.telemetry import TelemetryRepository
+from medbox.core.dto.box import BoxRequest, BoxResponse, BoxStatsResponse, BoxStatusUpdateRequest
 
 
 class BoxService:
@@ -21,6 +22,22 @@ class BoxService:
     ) -> None:
         self.tenant_id = tenant_id
         self.box_repo = box_repo or BoxRepository(tenant_id=tenant_id)
+
+    async def get_stats(self) -> BoxStatsResponse:
+        """Statistiques agrégées des boxes du tenant."""
+        data = await self.box_repo.get_stats()
+        return BoxStatsResponse(**data)
+
+    async def get_telemetry(self, box_uid: str, metric: str | None = None, limit: int = 100):
+        """Retourne l'historique de télémétrie d'une box (vérification tenant)."""
+        box = await self.box_repo.get_by_uid(box_uid)
+        if not box or box.tenant_id != self.tenant_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Box '{box_uid}' introuvable")
+        return await TelemetryRepository().list_by_box(box.id, metric=metric, limit=limit)
+
+    async def list_paginated(self, page: int = 1, per_page: int = 20) -> tuple[int, list]:
+        """Liste les boxes du tenant avec pagination."""
+        return await self.box_repo.list_paginated(page=page, per_page=per_page)
 
     async def list(self) -> list[BoxResponse]:
         """Liste toutes les boxes du tenant."""
@@ -65,7 +82,6 @@ class BoxService:
             patient_id=data.patient_id,
             status=data.status,
             firmware_version=data.firmware_version,
-            software_version=data.software_version,
             timezone=data.timezone,
         )
         created = await self.box_repo.create(box)
@@ -100,7 +116,6 @@ class BoxService:
         box.patient_id = data.patient_id
         box.status = data.status
         box.firmware_version = data.firmware_version
-        box.software_version = data.software_version
         box.timezone = data.timezone
 
         updated = await self.box_repo.update(box)
