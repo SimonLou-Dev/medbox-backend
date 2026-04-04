@@ -10,6 +10,7 @@ from medbox.core.db.models.invitation import Invitation
 from medbox.core.db.models.patient import Patient
 from medbox.core.db.models.prescription import Prescription
 from medbox.core.db.models.prescription_item import PrescriptionItem
+from medbox.core.db.models.prescription_schedule_item import PrescriptionScheduleItem
 from medbox.core.db.models.telemetry import Telemetry
 
 # Importer tous les modèles ici pour qu'Alembic les voie
@@ -28,6 +29,7 @@ __all__ = [
     "Patient",
     "Prescription",
     "PrescriptionItem",
+    "PrescriptionScheduleItem",
     "Telemetry",
     "Tenant",
     "User",
