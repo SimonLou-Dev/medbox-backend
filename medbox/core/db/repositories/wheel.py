@@ -5,9 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import case, func, outerjoin, select
 from sqlalchemy.orm import selectinload
 
+from medbox.core.db.models.box import Box
+from medbox.core.db.models.tenant import Tenant
 from medbox.core.db.models.wheel import Wheel
 from medbox.core.db.models.wheel_slot import WheelSlot
 from medbox.core.db.repositories.base import BaseRepository
@@ -20,6 +22,84 @@ class WheelRepository(BaseRepository[Wheel]):
     def __init__(self, tenant_id: UUID | None = None) -> None:
         super().__init__(Wheel)
         self.tenant_id = tenant_id
+
+    async def list_paginated(
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        with_slots: bool = False,
+    ) -> tuple[int, Sequence[Wheel]]:
+        """Liste les wheels du tenant avec pagination."""
+        if not self.tenant_id:
+            msg = "tenant_id requis"
+            raise ValueError(msg)
+        offset = (page - 1) * per_page
+        async with async_session_local() as session:
+            total = (
+                await session.execute(
+                    select(func.count()).select_from(Wheel).where(Wheel.tenant_id == self.tenant_id)
+                )
+            ).scalar_one()
+            stmt = (
+                select(Wheel)
+                .where(Wheel.tenant_id == self.tenant_id)
+                .order_by(Wheel.created_at.desc())
+                .offset(offset)
+                .limit(per_page)
+            )
+            if with_slots:
+                stmt = stmt.options(selectinload(Wheel.slots))
+            wheels = (await session.execute(stmt)).scalars().all()
+        return total, wheels
+
+    async def get_stats(self) -> dict:
+        """Statistiques agrégées des roues du tenant."""
+        if not self.tenant_id:
+            raise ValueError("tenant_id requis")
+        async with async_session_local() as session:
+            row = (await session.execute(
+                select(
+                    func.count().label("total"),
+                    func.count(case((Wheel.status == "mounted", 1))).label("mounted"),
+                    func.count(case((Wheel.status == "prepared", 1))).label("prepared"),
+                    func.count(case((Wheel.status == "in_stock", 1))).label("in_stock"),
+                ).where(Wheel.tenant_id == self.tenant_id)
+            )).one()
+        return {
+            "total": row.total,
+            "mounted": row.mounted,
+            "prepared": row.prepared,
+            "in_stock": row.in_stock,
+        }
+
+    async def list_all_paginated(
+        self,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[int, list[tuple]]:
+        """Liste toutes les wheels (admin) avec infos tenant et box."""
+        offset = (page - 1) * per_page
+        async with async_session_local() as session:
+            total = (await session.execute(select(func.count()).select_from(Wheel))).scalar_one()
+            stmt = (
+                select(Wheel, Tenant.name.label("tenant_name"), Box.box_uid.label("box_uid_label"))
+                .select_from(Wheel)
+                .outerjoin(Tenant, Wheel.tenant_id == Tenant.id)
+                .outerjoin(Box, Wheel.box_id == Box.id)
+                .order_by(Wheel.created_at.desc())
+                .offset(offset)
+                .limit(per_page)
+            )
+            rows = (await session.execute(stmt)).all()
+        return total, list(rows)
+
+    async def get_global(self, wheel_id: UUID, with_slots: bool = False) -> Wheel | None:
+        """Récupère une wheel par ID sans restriction tenant (admin)."""
+        async with async_session_local() as session:
+            stmt = select(Wheel).where(Wheel.id == wheel_id)
+            if with_slots:
+                stmt = stmt.options(selectinload(Wheel.slots))
+            return (await session.execute(stmt)).scalar_one_or_none()
 
     async def list(self, with_slots: bool = False) -> Sequence[Wheel]:
         """Liste toutes les roues du tenant."""

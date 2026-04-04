@@ -3,26 +3,30 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
+from pydantic import BaseModel
 
-from medbox.core.dto.box import BoxRequest, BoxResponse, BoxStatusUpdateRequest
+from medbox.core.dto.box import BoxRequest, BoxResponse, BoxStatsResponse, BoxStatusUpdateRequest
+from medbox.core.dto.telemetry import TelemetryResponse
 from medbox.core.services import CurrentUser, get_user_service
 from medbox.core.services.box import BoxService
+from medbox.core.services.box_admin import BoxAdminService
 from medbox.core.services.user import UserService
 
 router = APIRouter(prefix="/boxes", tags=["Boxes"])
 
 
-# ==============================================================================
-# Dependency
-# ==============================================================================
+class BoxPageResponse(BaseModel):
+    items: list[BoxResponse]
+    total: int
+    page: int
+    per_page: int
 
 
 async def get_box_service(
     user: CurrentUser,
     user_svc: Annotated[UserService, Depends(get_user_service)],
 ) -> BoxService:
-    """Crée un BoxService scoped par le tenant de l'utilisateur."""
     db_user = await user_svc.get_user_from_subject(user.subject)
     return BoxService(tenant_id=db_user.tenant_id)
 
@@ -30,28 +34,30 @@ async def get_box_service(
 BoxSvcDep = Annotated[BoxService, Depends(get_box_service)]
 
 
-# ==============================================================================
-# Routes
-# ==============================================================================
+@router.get("/stats")
+async def get_box_stats(
+    user: CurrentUser,
+    box_svc: BoxSvcDep,
+) -> BoxStatsResponse:
+    """Statistiques agrégées des boxes du tenant."""
+    return await box_svc.get_stats()
 
 
 @router.get("/")
 async def list_boxes(
     user: CurrentUser,
     box_svc: BoxSvcDep,
-) -> list[BoxResponse]:
-    """Liste toutes les boxes du tenant."""
-    return await box_svc.list()
-
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_box(
-    body: BoxRequest,
-    user: CurrentUser,
-    box_svc: BoxSvcDep,
-) -> BoxResponse:
-    """Enregistre une nouvelle box dans le tenant."""
-    return await box_svc.create(body)
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> BoxPageResponse:
+    """Liste les boxes du tenant avec pagination."""
+    total, boxes = await box_svc.list_paginated(page=page, per_page=per_page)
+    return BoxPageResponse(
+        items=[BoxResponse.from_model(b) for b in boxes],
+        total=total,
+        page=page,
+        per_page=per_page,
+    )
 
 
 @router.get("/{box_id}")
@@ -60,7 +66,6 @@ async def get_box(
     user: CurrentUser,
     box_svc: BoxSvcDep,
 ) -> BoxResponse:
-    """Récupère les détails d'une box."""
     return await box_svc.get(box_id)
 
 
@@ -71,8 +76,20 @@ async def update_box(
     user: CurrentUser,
     box_svc: BoxSvcDep,
 ) -> BoxResponse:
-    """Met à jour une box."""
     return await box_svc.update(box_id, body)
+
+
+@router.get("/{box_uid}/telemetry")
+async def get_box_telemetry(
+    box_uid: str,
+    user: CurrentUser,
+    box_svc: BoxSvcDep,
+    metric: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> list[TelemetryResponse]:
+    """Historique de télémétrie d'une box."""
+    entries = await box_svc.get_telemetry(box_uid, metric=metric, limit=limit)
+    return [TelemetryResponse.from_model(e) for e in entries]
 
 
 @router.patch("/{box_id}/status")
@@ -82,15 +99,31 @@ async def update_box_status(
     user: CurrentUser,
     box_svc: BoxSvcDep,
 ) -> BoxResponse:
-    """Met à jour uniquement le statut d'une box."""
     return await box_svc.update_status(box_id, body)
 
 
-@router.delete("/{box_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_box(
+# ==============================================================================
+# Adoption QR code
+# ==============================================================================
+
+
+@router.post("/{box_uid}/adopt", status_code=status.HTTP_200_OK)
+async def adopt_box(
+    box_uid: str,
+    user: CurrentUser,
+    user_svc: Annotated[UserService, Depends(get_user_service)],
+) -> BoxResponse:
+    """Appaire une box au tenant via scan QR code."""
+    db_user = await user_svc.get_user_from_subject(user.subject)
+    return await BoxAdminService().adopt(box_uid=box_uid, tenant_id=db_user.tenant_id)
+
+
+@router.delete("/{box_id}/unadopt", status_code=status.HTTP_200_OK)
+async def unadopt_box(
     box_id: UUID,
     user: CurrentUser,
-    box_svc: BoxSvcDep,
-) -> None:
-    """Supprime une box."""
-    await box_svc.delete(box_id)
+    user_svc: Annotated[UserService, Depends(get_user_service)],
+) -> BoxResponse:
+    """Détache une box du tenant."""
+    db_user = await user_svc.get_user_from_subject(user.subject)
+    return await BoxAdminService().unadopt(box_id=box_id, tenant_id=db_user.tenant_id)

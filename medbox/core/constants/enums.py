@@ -19,6 +19,7 @@ class UserRoles(Enum):
     CAREGIVER = "caregiver"
     TENANT_ADMIN = "tenant_admin"
     DEFAULT = "default"
+    SUPER_ADMIN = "super_admin"
 
 
 class InviteStatus(Enum):

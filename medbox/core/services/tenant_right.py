@@ -313,3 +313,31 @@ def require_tenant_role(role: UserRoles):
         return user
 
     return dependency
+
+
+def require_superadmin():
+    """Dependency qui vérifie que l'utilisateur a le rôle super_admin dans ses claims Keycloak."""
+
+    async def dependency(
+        request: Request,
+        response: Response,
+        security: Annotated[SecurityService, Depends(get_security_service)],
+    ) -> UserContext:
+        user = await security.get_current_user(request, response)
+
+        all_roles: list[str] = []
+        # Realm roles (flat mapper ou realm_access.roles)
+        all_roles += user.claims.get("realm_roles") or []
+        all_roles += user.claims.get("realm_access", {}).get("roles", [])
+        # Client roles (resource_access.<client>.roles)
+        for client_access in user.claims.get("resource_access", {}).values():
+            all_roles += client_access.get("roles", [])
+
+        if UserRoles.SUPER_ADMIN.value not in all_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Accès réservé aux super-admins",
+            )
+        return user
+
+    return dependency
