@@ -14,6 +14,7 @@ from medbox.core.dto.wheel import (
     WheelResponse,
     WheelSlotResponse,
     WheelSlotUpdateRequest,
+    WheelStatsResponse,
     WheelStatusUpdateRequest,
 )
 
@@ -28,6 +29,11 @@ class WheelService:
     ) -> None:
         self.tenant_id = tenant_id
         self.wheel_repo = wheel_repo or WheelRepository(tenant_id=tenant_id)
+
+    async def get_stats(self) -> WheelStatsResponse:
+        """Statistiques agrégées des roues du tenant."""
+        data = await self.wheel_repo.get_stats()
+        return WheelStatsResponse(**data)
 
     async def list(self) -> list[WheelResponse]:
         """Liste toutes les roues du tenant (avec leurs slots)."""
