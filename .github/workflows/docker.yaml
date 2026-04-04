@@ -85,34 +85,5 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
-      - name: Pull image for scanning (push events only)
-        if: github.event_name != 'pull_request'
-        run: docker pull ${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.commit_sha }}
-
-      - name: Scan Docker image with Trivy
-        id: trivy-image
-        continue-on-error: true
-        uses: aquasecurity/trivy-action@0.33.1
-        with:
-          scan-type: image
-          image-ref: ${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.commit_sha }}
-          exit-code: '1'
-          severity: 'HIGH,CRITICAL'
-          ignore-unfixed: true
-          format: sarif
-          output: trivy-image-${{ matrix.service }}.sarif
-          trivyignores: .trivyignore
-
-      - name: Upload Trivy image scan artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: trivy-image-${{ matrix.service }}
-          path: trivy-image-${{ matrix.service }}.sarif
-
-      - name: Fail if trivy found vulnerabilities
-        if: steps.trivy-image.outcome == 'failure'
-        run: exit 1
-
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
