@@ -16,12 +16,11 @@ def reset_db_engine(**kwargs) -> None:
     Nécessaire car asyncpg lie ses connexions à l'event loop du processus parent.
     Après fork, chaque worker doit créer ses propres connexions.
     """
-    from medbox.core.db import session as db_session
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.pool import NullPool
 
     from medbox.core.config.settings import settings
-
-    from sqlalchemy.pool import NullPool
+    from medbox.core.db import session as db_session
 
     db_session.engine.sync_engine.dispose(close=False)
     # NullPool : pas de réutilisation de connexion entre les asyncio.run() successifs

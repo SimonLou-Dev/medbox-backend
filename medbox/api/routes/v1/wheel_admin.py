@@ -38,7 +38,9 @@ async def admin_create_wheel(
     _: SuperAdmin,
 ) -> WheelResponse:
     """Crée une wheel sans tenant. Sera adoptée par un tenant."""
-    return await WheelAdminService().create(wheel_uid=body.wheel_uid, slot_count=body.slot_count)
+    return await WheelAdminService().create(
+        wheel_uid=body.wheel_uid, slot_count=body.slot_count
+    )
 
 
 @router.patch("/{wheel_id}/detach")

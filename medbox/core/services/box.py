@@ -9,7 +9,12 @@ from fastapi import HTTPException, status
 from medbox.core.db.models.box import Box
 from medbox.core.db.repositories.box import BoxRepository
 from medbox.core.db.repositories.telemetry import TelemetryRepository
-from medbox.core.dto.box import BoxRequest, BoxResponse, BoxStatsResponse, BoxStatusUpdateRequest
+from medbox.core.dto.box import (
+    BoxRequest,
+    BoxResponse,
+    BoxStatsResponse,
+    BoxStatusUpdateRequest,
+)
 
 
 class BoxService:
@@ -28,14 +33,23 @@ class BoxService:
         data = await self.box_repo.get_stats()
         return BoxStatsResponse(**data)
 
-    async def get_telemetry(self, box_uid: str, metric: str | None = None, limit: int = 100):
+    async def get_telemetry(
+        self, box_uid: str, metric: str | None = None, limit: int = 100
+    ):
         """Retourne l'historique de télémétrie d'une box (vérification tenant)."""
         box = await self.box_repo.get_by_uid(box_uid)
         if not box or box.tenant_id != self.tenant_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Box '{box_uid}' introuvable")
-        return await TelemetryRepository().list_by_box(box.id, metric=metric, limit=limit)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Box '{box_uid}' introuvable",
+            )
+        return await TelemetryRepository().list_by_box(
+            box.id, metric=metric, limit=limit
+        )
 
-    async def list_paginated(self, page: int = 1, per_page: int = 20) -> tuple[int, list]:
+    async def list_paginated(
+        self, page: int = 1, per_page: int = 20
+    ) -> tuple[int, list]:
         """Liste les boxes du tenant avec pagination."""
         return await self.box_repo.list_paginated(page=page, per_page=per_page)
 

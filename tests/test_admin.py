@@ -83,7 +83,6 @@ async def _create_invitation(
 
 
 class TestGetStats:
-
     async def test_stats_empty_tenant(self, db_session: AsyncSession) -> None:
         """Stats d'un tenant vide."""
         tenant = await _create_tenant(db_session)
@@ -130,7 +129,6 @@ class TestGetStats:
 
 
 class TestListMembers:
-
     async def test_list_members(self, db_session: AsyncSession) -> None:
         """Liste les membres d'un tenant."""
         tenant = await _create_tenant(db_session)
@@ -160,7 +158,6 @@ class TestListMembers:
 
 
 class TestUpdateMemberRole:
-
     async def test_update_role(self, db_session: AsyncSession) -> None:
         """Change le rôle d'un membre."""
         tenant = await _create_tenant(db_session)
@@ -247,7 +244,6 @@ class TestUpdateMemberRole:
 
 
 class TestRemoveMember:
-
     async def test_remove_member(self, db_session: AsyncSession) -> None:
         """Retire un membre du tenant."""
         tenant = await _create_tenant(db_session)
@@ -300,7 +296,6 @@ class TestRemoveMember:
 
 
 class TestInvitationHistory:
-
     async def test_invitation_history(self, db_session: AsyncSession) -> None:
         """Retourne l'historique des invitations."""
         tenant = await _create_tenant(db_session)

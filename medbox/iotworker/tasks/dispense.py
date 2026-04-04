@@ -39,6 +39,7 @@ def send_dispense_command(
         schedule_item_id: UUID du PrescriptionScheduleItem à marquer 'dispatched'
         prescription_item_id: UUID du médicament spécifique (optionnel)
     """
+
     async def _run() -> dict:
         from datetime import UTC, datetime
 
@@ -70,10 +71,12 @@ def send_dispense_command(
         from medbox.core.config.settings import settings
 
         topic = f"medbox/box/{box_uid}/cmd/dispense"
-        msg = json.dumps({
-            "schedule_item_id": schedule_item_id,
-            "prescription_item_id": prescription_item_id,
-        })
+        msg = json.dumps(
+            {
+                "schedule_item_id": schedule_item_id,
+                "prescription_item_id": prescription_item_id,
+            }
+        )
 
         tls_ctx = ssl.create_default_context(
             ssl.Purpose.SERVER_AUTH,
@@ -91,16 +94,16 @@ def send_dispense_command(
         ) as mqtt:
             await mqtt.publish(topic, payload=msg, qos=2)
 
-        logger.info("Commande dispense envoyée → box=%s item=%s", box_uid, schedule_item_id)
+        logger.info(
+            "Commande dispense envoyée → box=%s item=%s", box_uid, schedule_item_id
+        )
         return {"status": "dispatched", "box_uid": box_uid, "item_id": schedule_item_id}
 
     try:
         return asyncio.run(_run())
     except Exception as exc:
-        logger.error(
-            "Erreur lors du dispatch vers la box %s : %s", box_uid, exc
-        )
-        raise self.retry(exc=exc)
+        logger.error("Erreur lors du dispatch vers la box %s : %s", box_uid, exc)
+        raise self.retry(exc=exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +134,7 @@ def handle_take_event(
         schedule_item_id: UUID du PrescriptionScheduleItem concerné
         taken_at_iso: Horodatage ISO 8601 de la prise (ex: '2026-04-03T10:00:00Z')
     """
+
     async def _run() -> dict:
         from datetime import UTC, datetime
 
@@ -155,7 +159,9 @@ def handle_take_event(
 
         logger.info(
             "Prise confirmée : box=%s item=%s taken_at=%s",
-            box_uid, schedule_item_id, taken_at_iso,
+            box_uid,
+            schedule_item_id,
+            taken_at_iso,
         )
         return {"status": "taken", "item_id": schedule_item_id}
 
@@ -163,7 +169,7 @@ def handle_take_event(
         return asyncio.run(_run())
     except Exception as exc:
         logger.error("Erreur handle_take_event : %s", exc)
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc
 
 
 @celery_app.task(
@@ -191,6 +197,7 @@ def handle_error_event(
         error_code: Code d'erreur (ex: 'WHEEL_STUCK', 'TIMEOUT', 'DOOR_OPEN')
         tenant_id: UUID du tenant propriétaire de la box
     """
+
     async def _run() -> dict:
         from medbox.core.db.repositories.box import BoxRepository
         from medbox.core.db.repositories.prescription_schedule_item import (
@@ -218,7 +225,8 @@ def handle_error_event(
             results["box_status"] = "maintenance"
             logger.warning(
                 "Box %s passée en maintenance suite à erreur %s",
-                box_uid, error_code,
+                box_uid,
+                error_code,
             )
 
         return results
@@ -227,4 +235,4 @@ def handle_error_event(
         return asyncio.run(_run())
     except Exception as exc:
         logger.error("Erreur handle_error_event box=%s : %s", box_uid, exc)
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc

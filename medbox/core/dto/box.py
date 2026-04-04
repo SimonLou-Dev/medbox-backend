@@ -54,6 +54,6 @@ class BoxStatsResponse(BaseModel):
     """Statistiques agrégées des boxes du tenant."""
 
     total: int
-    online: int          # last_seen_at < 10min
-    offline_alert: int   # actives mais non vues depuis > 10min
-    never_connected: int # jamais vues (last_seen_at is null) et actives
+    online: int  # last_seen_at < 10min
+    offline_alert: int  # actives mais non vues depuis > 10min
+    never_connected: int  # jamais vues (last_seen_at is null) et actives

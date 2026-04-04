@@ -65,7 +65,6 @@ async def _create_user(
 
 
 class TestTenantGetUpdate:
-
     async def test_get_tenant(self, db_session: AsyncSession) -> None:
         """Récupère un tenant avec ses compteurs."""
         tenant = await _create_tenant(db_session, "Clinique A")
@@ -102,7 +101,6 @@ class TestTenantGetUpdate:
 
 
 class TestTenantDelete:
-
     async def test_delete_tenant(self, db_session: AsyncSession) -> None:
         """Supprime un tenant."""
         tenant = await _create_tenant(db_session, "A supprimer")
@@ -145,7 +143,6 @@ class TestTenantDelete:
 
 
 class TestLeaveTenant:
-
     async def test_leave_tenant_success(self, db_session: AsyncSession) -> None:
         """Un CAREGIVER peut quitter son tenant."""
         tenant = await _create_tenant(db_session, "Tenant Quitter")
@@ -193,7 +190,6 @@ class TestLeaveTenant:
 
 
 class TestTenantCreate:
-
     async def test_create_tenant(self, db_session: AsyncSession) -> None:
         """Crée un tenant et nomme l'utilisateur admin."""
         user = await _create_user(db_session, tenant_id=None, status=UserStatus.PENDING)
@@ -212,9 +208,10 @@ class TestTenantCreate:
         )
 
         from medbox.core.services.security import UserContext
+
         ctx = UserContext(
             claims={"sub": user.keycloak_subject, "email": user.email},
-            token="test-token",
+            token="test-token",  # noqa: S106
         )
 
         tenant, _ = await svc.create(TenantRequest(name="Nouveau Tenant"), ctx)
@@ -233,9 +230,10 @@ class TestTenantCreate:
         svc = _make_svc()
 
         from medbox.core.services.security import UserContext
+
         ctx = UserContext(
             claims={"sub": user.keycloak_subject, "email": user.email},
-            token="test-token",
+            token="test-token",  # noqa: S106
         )
 
         with pytest.raises(HTTPException) as exc_info:

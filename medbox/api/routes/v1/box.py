@@ -6,7 +6,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel
 
-from medbox.core.dto.box import BoxRequest, BoxResponse, BoxStatsResponse, BoxStatusUpdateRequest
+from medbox.core.dto.box import (
+    BoxRequest,
+    BoxResponse,
+    BoxStatsResponse,
+    BoxStatusUpdateRequest,
+)
 from medbox.core.dto.telemetry import TelemetryResponse
 from medbox.core.services import CurrentUser, get_user_service
 from medbox.core.services.box import BoxService

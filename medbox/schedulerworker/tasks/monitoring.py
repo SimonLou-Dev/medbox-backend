@@ -24,6 +24,7 @@ def monitor_boxes(self) -> dict:
     Détecte les boxes offline (last_seen_at > 15 minutes).
     Fréquence : toutes les 5 minutes via Celery Beat.
     """
+
     async def _run() -> dict:
         from sqlalchemy import select
 
@@ -45,19 +46,29 @@ def monitor_boxes(self) -> dict:
             if last_seen.tzinfo is None:
                 last_seen = last_seen.replace(tzinfo=UTC)
             if last_seen < offline_cutoff:
-                alerts.append({
-                    "type": "box_offline",
-                    "box_uid": box.box_uid,
-                    "box_id": str(box.id),
-                    "last_seen_at": box.last_seen_at.isoformat(),
-                })
-                logger.warning("Box %s offline depuis %s", box.box_uid, box.last_seen_at)
+                alerts.append(
+                    {
+                        "type": "box_offline",
+                        "box_uid": box.box_uid,
+                        "box_id": str(box.id),
+                        "last_seen_at": box.last_seen_at.isoformat(),
+                    }
+                )
+                logger.warning(
+                    "Box %s offline depuis %s", box.box_uid, box.last_seen_at
+                )
 
-        logger.info("monitor_boxes : %d boxes vérifiées, %d alertes", len(boxes), len(alerts))
-        return {"boxes_checked": len(boxes), "alerts": len(alerts), "alert_details": alerts}
+        logger.info(
+            "monitor_boxes : %d boxes vérifiées, %d alertes", len(boxes), len(alerts)
+        )
+        return {
+            "boxes_checked": len(boxes),
+            "alerts": len(alerts),
+            "alert_details": alerts,
+        }
 
     try:
         return asyncio.run(_run())
     except Exception as exc:
         logger.error("Erreur monitor_boxes : %s", exc)
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc

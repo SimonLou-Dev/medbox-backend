@@ -73,12 +73,14 @@ async def _check_rtc_drift(
 
     drift_seconds = abs((now - box_time).total_seconds())
 
-    await TelemetryRepository().add(Telemetry(
-        tenant_id=box.tenant_id,
-        box_id=box.id,
-        metric="rtc_drift_seconds",
-        value_number=drift_seconds,
-    ))
+    await TelemetryRepository().add(
+        Telemetry(
+            tenant_id=box.tenant_id,
+            box_id=box.id,
+            metric="rtc_drift_seconds",
+            value_number=drift_seconds,
+        )
+    )
 
     if drift_seconds <= RTC_DRIFT_THRESHOLD_SECONDS:
         return drift_seconds, False
@@ -112,6 +114,7 @@ def handle_telemetry(self, box_uid: str, payload: dict) -> dict:
             "current_date": "2026-04-03T09:45:00Z"
         }
     """
+
     async def _run() -> dict:
         from datetime import UTC, datetime
 
@@ -154,7 +157,10 @@ def handle_telemetry(self, box_uid: str, payload: dict) -> dict:
                 await session.commit()
 
         drift_seconds, rtc_correction_sent = await _check_rtc_drift(
-            box_uid, box, payload, now,
+            box_uid,
+            box,
+            payload,
+            now,
         )
 
         logger.info(
@@ -174,7 +180,7 @@ def handle_telemetry(self, box_uid: str, payload: dict) -> dict:
         return asyncio.run(_run())
     except Exception as exc:
         logger.error("Erreur handle_telemetry box=%s : %s", box_uid, exc)
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc
 
 
 @celery_app.task(
@@ -192,6 +198,7 @@ def handle_box_event(self, box_uid: str, payload: dict) -> dict:
     Payload:
         {"type": "DISTRIBUTION_OK", "schedule_item_id": "uuid", "slot_index": 2}
     """
+
     async def _run() -> dict:
         from datetime import UTC, datetime
 
@@ -219,12 +226,14 @@ def handle_box_event(self, box_uid: str, payload: dict) -> dict:
                 box.last_seen_at = datetime.now(tz=UTC)
                 await session.commit()
 
-        await EventRepository().add(Event(
-            tenant_id=box.tenant_id,
-            box_id=box.id,
-            type=event_type,
-            payload={k: v for k, v in payload.items() if k != "type"},
-        ))
+        await EventRepository().add(
+            Event(
+                tenant_id=box.tenant_id,
+                box_id=box.id,
+                type=event_type,
+                payload={k: v for k, v in payload.items() if k != "type"},
+            )
+        )
 
         logger.info("Événement reçu box=%s type=%s", box_uid, event_type)
         return {"status": "ok", "box_uid": box_uid, "event_type": event_type}
@@ -233,4 +242,4 @@ def handle_box_event(self, box_uid: str, payload: dict) -> dict:
         return asyncio.run(_run())
     except Exception as exc:
         logger.error("Erreur handle_box_event box=%s : %s", box_uid, exc)
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc

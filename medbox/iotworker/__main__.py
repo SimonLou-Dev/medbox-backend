@@ -16,12 +16,16 @@ def _run_celery() -> None:
     proc = subprocess.run(  # noqa: S603
         [  # noqa: S607
             "celery",
-            "-A", "medbox.iotworker.broker",
+            "-A",
+            "medbox.iotworker.broker",
             "worker",
             "--loglevel=info",
-            "-Q", "iot",
-            "-c", "4",
-            "-n", "iot@%i",
+            "-Q",
+            "iot",
+            "-c",
+            "4",
+            "-n",
+            "iot@%i",
         ],
         check=False,
     )
@@ -42,6 +46,7 @@ def run() -> None:
 
     # MQTT listener dans le thread principal (asyncio)
     from medbox.iotworker.mqtt_listener import start as mqtt_start
+
     logger.info("Démarrage du listener MQTT...")
     asyncio.run(mqtt_start())
 

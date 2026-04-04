@@ -17,10 +17,10 @@ from medbox.core.db.session import async_session_local
 from medbox.core.dto.box import BoxResponse
 from medbox.core.dto.wheel import WheelResponse
 
-
 # ---------------------------------------------------------------------------
 # DTOs spécifiques admin
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class BoxAdminListItem:
@@ -45,6 +45,7 @@ class BoxAdminListResponse:
 # Service
 # ---------------------------------------------------------------------------
 
+
 class BoxAdminService:
     """Service admin système — opérations sur les boxes sans scope tenant."""
 
@@ -57,7 +58,9 @@ class BoxAdminService:
 
         async with async_session_local() as session:
             # COUNT
-            total = (await session.execute(select(func.count()).select_from(Box))).scalar_one()
+            total = (
+                await session.execute(select(func.count()).select_from(Box))
+            ).scalar_one()
 
             # JOIN boxes → tenants (LEFT OUTER pour boxes sans tenant)
             stmt = (
@@ -81,7 +84,9 @@ class BoxAdminService:
             )
             for box, tenant_name in rows
         ]
-        return BoxAdminListResponse(items=items, total=total, page=page, per_page=per_page)
+        return BoxAdminListResponse(
+            items=items, total=total, page=page, per_page=per_page
+        )
 
     async def create(self, box_uid: str, name: str | None = None) -> BoxResponse:
         """Crée une box sans tenant."""
@@ -99,7 +104,10 @@ class BoxAdminService:
         """Détache une wheel de sa box (status → in_stock)."""
         box = await self._repo.get_by_uid(box_uid)
         if not box:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Box '{box_uid}' introuvable")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Box '{box_uid}' introuvable",
+            )
 
         async with async_session_local() as session:
             result = await session.execute(
@@ -108,7 +116,10 @@ class BoxAdminService:
             wheel = result.scalar_one_or_none()
 
         if not wheel:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Wheel {wheel_id} introuvable sur cette box")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Wheel {wheel_id} introuvable sur cette box",
+            )
 
         wheel.box_id = None
         wheel.status = "in_stock"
@@ -120,7 +131,10 @@ class BoxAdminService:
         """Supprime définitivement une wheel."""
         box = await self._repo.get_by_uid(box_uid)
         if not box:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Box '{box_uid}' introuvable")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Box '{box_uid}' introuvable",
+            )
 
         async with async_session_local() as session:
             result = await session.execute(
@@ -128,7 +142,10 @@ class BoxAdminService:
             )
             wheel = result.scalar_one_or_none()
             if not wheel:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Wheel {wheel_id} introuvable sur cette box")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Wheel {wheel_id} introuvable sur cette box",
+                )
             await session.delete(wheel)
             await session.commit()
 
@@ -136,9 +153,15 @@ class BoxAdminService:
         """Rattache une box à un tenant."""
         box = await self._repo.get_by_uid(box_uid)
         if not box:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Box '{box_uid}' introuvable")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Box '{box_uid}' introuvable",
+            )
         if box.tenant_id is not None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cette box est déjà rattachée à un tenant")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cette box est déjà rattachée à un tenant",
+            )
         box.tenant_id = tenant_id
         box.status = "active"
         updated = await self._repo.update(box)
@@ -149,7 +172,10 @@ class BoxAdminService:
         repo = BoxRepository(tenant_id=tenant_id)
         box = await repo.get(box_id)
         if not box:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Box {box_id} introuvable dans ce tenant")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Box {box_id} introuvable dans ce tenant",
+            )
         box.tenant_id = None
         box.status = "inactive"
         updated = await self._repo.update(box)

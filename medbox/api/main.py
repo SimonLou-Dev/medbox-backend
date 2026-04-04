@@ -45,7 +45,9 @@ async def lifespan(app: FastAPI):
         sync_medications_from_api.delay()
         logger.info("✅ Sync médicaments envoyée à la queue Celery")
     except Exception as e:
-        logger.warning("⚠️  Impossible d'envoyer la tâche de sync : %s", e, exc_info=True)
+        logger.warning(
+            "⚠️  Impossible d'envoyer la tâche de sync : %s", e, exc_info=True
+        )
 
     yield
 

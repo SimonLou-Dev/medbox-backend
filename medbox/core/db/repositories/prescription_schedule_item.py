@@ -13,9 +13,7 @@ from medbox.core.db.repositories.base import BaseRepository
 from medbox.core.db.session import async_session_local
 
 
-class PrescriptionScheduleItemRepository(
-    BaseRepository[PrescriptionScheduleItem]
-):
+class PrescriptionScheduleItemRepository(BaseRepository[PrescriptionScheduleItem]):
     """Repository pour PrescriptionScheduleItem, scopé par tenant."""
 
     def __init__(self, tenant_id: UUID | None = None) -> None:

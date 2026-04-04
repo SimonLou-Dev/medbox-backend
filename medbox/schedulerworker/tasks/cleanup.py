@@ -25,14 +25,16 @@ def cleanup_job(self) -> dict:
 
     Planifié quotidiennement à 02:00 UTC via Celery Beat.
     """
+
     async def _run() -> dict:
+        from sqlalchemy import select
+
         from medbox.core.constants.enums import InviteStatus
         from medbox.core.db.models.invitation import Invitation
         from medbox.core.db.models.prescription_schedule_item import (
             PrescriptionScheduleItem,
         )
         from medbox.core.db.session import async_session_local
-        from sqlalchemy import select
 
         now = datetime.now(tz=UTC)
         stats: dict[str, int] = {}
@@ -85,4 +87,4 @@ def cleanup_job(self) -> dict:
         return asyncio.run(_run())
     except Exception as exc:
         logger.error("Erreur cleanup_job : %s", exc)
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc

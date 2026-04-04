@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from uuid import UUID
-
 from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import selectinload
@@ -35,7 +34,9 @@ class BoxRepository(BaseRepository[Box]):
         async with async_session_local() as session:
             total = (
                 await session.execute(
-                    select(func.count()).select_from(Box).where(Box.tenant_id == self.tenant_id)
+                    select(func.count())
+                    .select_from(Box)
+                    .where(Box.tenant_id == self.tenant_id)
                 )
             ).scalar_one()
             stmt = (
@@ -55,20 +56,34 @@ class BoxRepository(BaseRepository[Box]):
         now = datetime.now(tz=UTC)
         threshold = now - timedelta(minutes=10)
         async with async_session_local() as session:
-            row = (await session.execute(
-                select(
-                    func.count().label("total"),
-                    func.count(case((Box.last_seen_at >= threshold, 1))).label("online"),
-                    func.count(case((
-                        (Box.last_seen_at < threshold) & (Box.status != "inactive"),
-                        1,
-                    ))).label("offline_alert"),
-                    func.count(case((
-                        (Box.last_seen_at.is_(None)) & (Box.status != "inactive"),
-                        1,
-                    ))).label("never_connected"),
-                ).where(Box.tenant_id == self.tenant_id)
-            )).one()
+            row = (
+                await session.execute(
+                    select(
+                        func.count().label("total"),
+                        func.count(case((Box.last_seen_at >= threshold, 1))).label(
+                            "online"
+                        ),
+                        func.count(
+                            case(
+                                (
+                                    (Box.last_seen_at < threshold)
+                                    & (Box.status != "inactive"),
+                                    1,
+                                )
+                            )
+                        ).label("offline_alert"),
+                        func.count(
+                            case(
+                                (
+                                    (Box.last_seen_at.is_(None))
+                                    & (Box.status != "inactive"),
+                                    1,
+                                )
+                            )
+                        ).label("never_connected"),
+                    ).where(Box.tenant_id == self.tenant_id)
+                )
+            ).one()
         return {
             "total": row.total,
             "online": row.online,

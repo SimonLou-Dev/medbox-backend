@@ -45,4 +45,4 @@ def expire_invitation(self, invite_id: str) -> None:
         logger.error(
             "Erreur lors de l'expiration de l'invitation %s : %s", invite_id, exc
         )
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc

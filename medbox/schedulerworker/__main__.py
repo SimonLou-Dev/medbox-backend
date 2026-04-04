@@ -9,12 +9,16 @@ def run() -> None:
     subprocess.run(  # noqa: S603
         [  # noqa: S607
             "celery",
-            "-A", "medbox.schedulerworker.broker_config",
+            "-A",
+            "medbox.schedulerworker.broker_config",
             "worker",
             "--loglevel=info",
-            "-Q", "scheduler",
-            "-c", "2",
-            "-n", "scheduler@%h",
+            "-Q",
+            "scheduler",
+            "-c",
+            "2",
+            "-n",
+            "scheduler@%h",
         ],
         check=True,
     )
@@ -25,10 +29,12 @@ def run_beat() -> None:
     subprocess.run(  # noqa: S603
         [  # noqa: S607
             "celery",
-            "-A", "medbox.schedulerworker.broker_config",
+            "-A",
+            "medbox.schedulerworker.broker_config",
             "beat",
             "--loglevel=info",
-            "--scheduler", "celery.beat.PersistentScheduler",
+            "--scheduler",
+            "celery.beat.PersistentScheduler",
         ],
         check=True,
     )

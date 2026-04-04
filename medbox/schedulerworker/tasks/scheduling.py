@@ -25,6 +25,7 @@ def dispatch_scheduled_takes(self) -> dict:
 
     Fréquence : toutes les 5 minutes via Celery Beat.
     """
+
     async def _run() -> dict:
         from medbox.core.db.repositories.prescription_schedule_item import (
             PrescriptionScheduleItemRepository,
@@ -41,13 +42,12 @@ def dispatch_scheduled_takes(self) -> dict:
         dispatched = 0
         for item in due_items:
             if not item.box_id:
-                logger.warning(
-                    "Schedule item %s sans box_id, ignoré", item.id
-                )
+                logger.warning("Schedule item %s sans box_id, ignoré", item.id)
                 continue
 
             # Récupérer le box_uid depuis la DB
             from medbox.core.db.repositories.box import BoxRepository
+
             box_repo = BoxRepository(tenant_id=item.tenant_id)
             box = await box_repo.get(item.box_id)
 
@@ -71,7 +71,7 @@ def dispatch_scheduled_takes(self) -> dict:
         return asyncio.run(_run())
     except Exception as exc:
         logger.error("Erreur dispatch_scheduled_takes : %s", exc)
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc
 
 
 @celery_app.task(
@@ -89,22 +89,25 @@ def calculate_prescription_scheduling(self) -> dict:
 
     Fréquence : toutes les heures via Celery Beat.
     """
+
     async def _run() -> dict:
-        from medbox.core.db.repositories.prescription_schedule_item import (
-            PrescriptionScheduleItemRepository,
-        )
-        from medbox.core.db.session import async_session_local
+        from sqlalchemy import select
+
         from medbox.core.db.models.prescription import Prescription
         from medbox.core.db.models.prescription_schedule_item import (
             PrescriptionScheduleItem,
         )
-        from sqlalchemy import select
+        from medbox.core.db.repositories.prescription_schedule_item import (
+            PrescriptionScheduleItemRepository,
+        )
+        from medbox.core.db.session import async_session_local
 
         created = 0
 
         async with async_session_local() as session:
             # Prescriptions actives avec leurs items
             from sqlalchemy.orm import selectinload
+
             stmt = (
                 select(Prescription)
                 .where(Prescription.status == "active")
@@ -123,6 +126,7 @@ def calculate_prescription_scheduling(self) -> dict:
 
                 # Calcule les horaires de la prochaine journée
                 from datetime import timedelta
+
                 interval_hours = 24 // times_per_day
 
                 for i in range(times_per_day):
@@ -136,7 +140,7 @@ def calculate_prescription_scheduling(self) -> dict:
                         and e.prescription_item_id == item.id
                         and e.status == "pending"
                         for e in existing
-                        if e.scheduled_at.tzinfo is not None or True
+                        if True
                     )
 
                     if already_exists:
@@ -163,4 +167,4 @@ def calculate_prescription_scheduling(self) -> dict:
         return asyncio.run(_run())
     except Exception as exc:
         logger.error("Erreur calculate_prescription_scheduling : %s", exc)
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc

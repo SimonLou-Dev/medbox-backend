@@ -49,7 +49,6 @@ def _req(**kwargs) -> WheelRequest:
 
 
 class TestWheelCRUD:
-
     async def test_create_and_get(self, db_session: AsyncSession) -> None:
         """Crée une roue et la récupère avec ses slots."""
         tenant = await _setup_tenant(db_session)
@@ -136,7 +135,6 @@ class TestWheelCRUD:
 
 
 class TestWheelSlots:
-
     async def test_list_slots(self, db_session: AsyncSession) -> None:
         """Liste les slots d'une roue."""
         tenant = await _setup_tenant(db_session)
@@ -219,7 +217,6 @@ class TestWheelSlots:
 
 
 class TestWheelErrors:
-
     async def test_get_not_found(self, db_session: AsyncSession) -> None:
         tenant = await _setup_tenant(db_session)
         svc = _svc(tenant.id)
@@ -269,7 +266,6 @@ class TestWheelErrors:
 
 
 class TestWheelTenantIsolation:
-
     async def test_tenant_isolation(self, db_session: AsyncSession) -> None:
         """Un tenant ne peut pas voir les roues d'un autre tenant."""
         tenant_a = Tenant(id=uuid4(), name="WheelTenantA")

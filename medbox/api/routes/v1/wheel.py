@@ -106,7 +106,9 @@ async def adopt_wheel(
 ) -> WheelResponse:
     """Adopte une wheel (scan QR) → rattache au tenant."""
     db_user = await user_svc.get_user_from_subject(user.subject)
-    return await WheelAdminService().adopt(wheel_uid=wheel_uid, tenant_id=db_user.tenant_id)
+    return await WheelAdminService().adopt(
+        wheel_uid=wheel_uid, tenant_id=db_user.tenant_id
+    )
 
 
 @router.delete("/{wheel_id}/unadopt", status_code=status.HTTP_200_OK)
@@ -117,7 +119,9 @@ async def unadopt_wheel(
 ) -> WheelResponse:
     """Détache une wheel du tenant."""
     db_user = await user_svc.get_user_from_subject(user.subject)
-    return await WheelAdminService().unadopt(wheel_id=wheel_id, tenant_id=db_user.tenant_id)
+    return await WheelAdminService().unadopt(
+        wheel_id=wheel_id, tenant_id=db_user.tenant_id
+    )
 
 
 # ==============================================================================
@@ -149,7 +153,9 @@ async def unmount_wheel(
 ) -> WheelResponse:
     """Démonte une wheel de sa box."""
     db_user = await user_svc.get_user_from_subject(user.subject)
-    return await WheelAdminService().unmount(wheel_id=wheel_id, tenant_id=db_user.tenant_id)
+    return await WheelAdminService().unmount(
+        wheel_id=wheel_id, tenant_id=db_user.tenant_id
+    )
 
 
 # ==============================================================================

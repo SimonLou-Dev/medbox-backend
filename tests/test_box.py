@@ -61,7 +61,6 @@ def _req(**kwargs) -> BoxRequest:
 
 
 class TestBoxCRUD:
-
     async def test_create_and_get(self, db_session: AsyncSession) -> None:
         """Crée une box et la récupère."""
         tenant = await _setup_tenant(db_session)
@@ -150,7 +149,6 @@ class TestBoxCRUD:
 
 
 class TestBoxErrors:
-
     async def test_get_not_found(self, db_session: AsyncSession) -> None:
         """Lève 404 si la box n'existe pas."""
         tenant = await _setup_tenant(db_session)
@@ -196,7 +194,6 @@ class TestBoxErrors:
 
 
 class TestBoxTenantIsolation:
-
     async def test_tenant_isolation(self, db_session: AsyncSession) -> None:
         """Un tenant ne peut pas voir les boxes d'un autre tenant."""
         tenant_a = Tenant(id=uuid4(), name="TenantA")

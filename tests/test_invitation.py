@@ -84,16 +84,13 @@ async def _create_invitation(
 
 
 class TestGenerateInviteCode:
-
     async def test_generate_code(self, db_session: AsyncSession) -> None:
         """Génère un code d'invitation valide."""
         tenant = await _create_tenant(db_session)
         sender = await _create_user(db_session, tenant_id=tenant.id)
         svc = _make_svc()
 
-        with patch(
-            "medbox.core.tasks.invitation_tasks.expire_invitation.apply_async"
-        ):
+        with patch("medbox.core.tasks.invitation_tasks.expire_invitation.apply_async"):
             invite = await svc.generate_invite_code(sender, tenant.id)
 
         assert invite.tenant_id == tenant.id
@@ -108,9 +105,7 @@ class TestGenerateInviteCode:
         existing = await _create_invitation(db_session, tenant.id, sender.id)
         svc = _make_svc()
 
-        with patch(
-            "medbox.core.tasks.invitation_tasks.expire_invitation.apply_async"
-        ):
+        with patch("medbox.core.tasks.invitation_tasks.expire_invitation.apply_async"):
             new_invite = await svc.generate_invite_code(sender, tenant.id)
 
         # L'ancien code doit être expiré
@@ -129,7 +124,6 @@ class TestGenerateInviteCode:
 
 
 class TestClaimInvitation:
-
     async def test_claim_valid_code(self, db_session: AsyncSession) -> None:
         """Un utilisateur rejoint le tenant avec un code valide."""
         tenant = await _create_tenant(db_session)
@@ -203,7 +197,6 @@ class TestClaimInvitation:
 
 
 class TestRevokeInvitation:
-
     async def test_revoke_invitation(self, db_session: AsyncSession) -> None:
         """Annule une invitation active."""
         tenant = await _create_tenant(db_session)
@@ -232,7 +225,6 @@ class TestRevokeInvitation:
 
 
 class TestExpireInvitation:
-
     async def test_expire_invitation(self, db_session: AsyncSession) -> None:
         """Marque une invitation comme expirée."""
         tenant = await _create_tenant(db_session)
@@ -260,7 +252,6 @@ class TestExpireInvitation:
 
 
 class TestGetActiveCode:
-
     async def test_get_active_code(self, db_session: AsyncSession) -> None:
         """Retourne le code actif du tenant."""
         tenant = await _create_tenant(db_session)

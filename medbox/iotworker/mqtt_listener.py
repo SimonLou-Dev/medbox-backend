@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import ssl
-from collections.abc import Callable
+from pathlib import Path
 
 import aiomqtt
 
@@ -44,17 +44,20 @@ def _segment_from_topic(topic: str) -> str | None:
 
 
 def _build_tls_context() -> ssl.SSLContext:
-    ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=settings.emqx_ca_cert)
-    ctx.load_cert_chain(certfile=settings.emqx_client_cert, keyfile=settings.emqx_client_key)
+    ctx = ssl.create_default_context(
+        ssl.Purpose.SERVER_AUTH, cafile=settings.emqx_ca_cert
+    )
+    ctx.load_cert_chain(
+        certfile=settings.emqx_client_cert, keyfile=settings.emqx_client_key
+    )
     return ctx
 
 
 def _get_cert_cn() -> str:
     """Lit le CN du certificat client pour l'utiliser comme username MQTT."""
     from cryptography import x509
-    from cryptography.hazmat.primitives.serialization import Encoding
 
-    with open(settings.emqx_client_cert, "rb") as f:
+    with Path(settings.emqx_client_cert).open("rb") as f:
         cert = x509.load_pem_x509_certificate(f.read())
 
     cn = cert.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)
@@ -108,7 +111,9 @@ async def start() -> None:
             try:
                 payload = json.loads(message.payload)
             except json.JSONDecodeError:
-                logger.error("Payload JSON invalide sur %s : %r", topic, message.payload)
+                logger.error(
+                    "Payload JSON invalide sur %s : %r", topic, message.payload
+                )
                 continue
 
             celery_app.send_task(task_name, args=[box_uid, payload])

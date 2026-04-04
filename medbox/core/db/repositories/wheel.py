@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import case, func, outerjoin, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import selectinload
 
 from medbox.core.db.models.box import Box
@@ -37,7 +37,9 @@ class WheelRepository(BaseRepository[Wheel]):
         async with async_session_local() as session:
             total = (
                 await session.execute(
-                    select(func.count()).select_from(Wheel).where(Wheel.tenant_id == self.tenant_id)
+                    select(func.count())
+                    .select_from(Wheel)
+                    .where(Wheel.tenant_id == self.tenant_id)
                 )
             ).scalar_one()
             stmt = (
@@ -57,14 +59,22 @@ class WheelRepository(BaseRepository[Wheel]):
         if not self.tenant_id:
             raise ValueError("tenant_id requis")
         async with async_session_local() as session:
-            row = (await session.execute(
-                select(
-                    func.count().label("total"),
-                    func.count(case((Wheel.status == "mounted", 1))).label("mounted"),
-                    func.count(case((Wheel.status == "prepared", 1))).label("prepared"),
-                    func.count(case((Wheel.status == "in_stock", 1))).label("in_stock"),
-                ).where(Wheel.tenant_id == self.tenant_id)
-            )).one()
+            row = (
+                await session.execute(
+                    select(
+                        func.count().label("total"),
+                        func.count(case((Wheel.status == "mounted", 1))).label(
+                            "mounted"
+                        ),
+                        func.count(case((Wheel.status == "prepared", 1))).label(
+                            "prepared"
+                        ),
+                        func.count(case((Wheel.status == "in_stock", 1))).label(
+                            "in_stock"
+                        ),
+                    ).where(Wheel.tenant_id == self.tenant_id)
+                )
+            ).one()
         return {
             "total": row.total,
             "mounted": row.mounted,
@@ -80,9 +90,15 @@ class WheelRepository(BaseRepository[Wheel]):
         """Liste toutes les wheels (admin) avec infos tenant et box."""
         offset = (page - 1) * per_page
         async with async_session_local() as session:
-            total = (await session.execute(select(func.count()).select_from(Wheel))).scalar_one()
+            total = (
+                await session.execute(select(func.count()).select_from(Wheel))
+            ).scalar_one()
             stmt = (
-                select(Wheel, Tenant.name.label("tenant_name"), Box.box_uid.label("box_uid_label"))
+                select(
+                    Wheel,
+                    Tenant.name.label("tenant_name"),
+                    Box.box_uid.label("box_uid_label"),
+                )
                 .select_from(Wheel)
                 .outerjoin(Tenant, Wheel.tenant_id == Tenant.id)
                 .outerjoin(Box, Wheel.box_id == Box.id)
@@ -93,7 +109,9 @@ class WheelRepository(BaseRepository[Wheel]):
             rows = (await session.execute(stmt)).all()
         return total, list(rows)
 
-    async def get_global(self, wheel_id: UUID, with_slots: bool = False) -> Wheel | None:
+    async def get_global(
+        self, wheel_id: UUID, with_slots: bool = False
+    ) -> Wheel | None:
         """Récupère une wheel par ID sans restriction tenant (admin)."""
         async with async_session_local() as session:
             stmt = select(Wheel).where(Wheel.id == wheel_id)

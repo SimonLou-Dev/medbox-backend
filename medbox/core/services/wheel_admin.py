@@ -41,7 +41,9 @@ class WheelAdminService:
     def __init__(self) -> None:
         self._repo = WheelRepository()
 
-    async def list_all(self, page: int = 1, per_page: int = 20) -> WheelAdminListResponse:
+    async def list_all(
+        self, page: int = 1, per_page: int = 20
+    ) -> WheelAdminListResponse:
         """Liste toutes les wheels avec infos tenant et box, paginées."""
         total, rows = await self._repo.list_all_paginated(page=page, per_page=per_page)
         items = [
@@ -57,7 +59,9 @@ class WheelAdminService:
             )
             for wheel, tenant_name, box_uid_label in rows
         ]
-        return WheelAdminListResponse(items=items, total=total, page=page, per_page=per_page)
+        return WheelAdminListResponse(
+            items=items, total=total, page=page, per_page=per_page
+        )
 
     async def create(self, wheel_uid: str, slot_count: int = 28) -> WheelResponse:
         """Crée une wheel sans tenant ni box."""
@@ -77,7 +81,10 @@ class WheelAdminService:
         """Détache une wheel de sa box (box_id → None, status → in_stock)."""
         wheel = await self._repo.get_global(wheel_id)
         if not wheel:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Wheel {wheel_id} introuvable")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Wheel {wheel_id} introuvable",
+            )
         wheel.box_id = None
         wheel.status = "in_stock"
         updated = await self._repo.update(wheel)
@@ -89,7 +96,10 @@ class WheelAdminService:
             result = await session.execute(select(Wheel).where(Wheel.id == wheel_id))
             wheel = result.scalar_one_or_none()
             if not wheel:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Wheel {wheel_id} introuvable")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Wheel {wheel_id} introuvable",
+                )
             await session.delete(wheel)
             await session.commit()
 
@@ -97,9 +107,15 @@ class WheelAdminService:
         """Rattache une wheel à un tenant."""
         wheel = await self._repo.get_by_uid(wheel_uid)
         if not wheel:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Wheel '{wheel_uid}' introuvable")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Wheel '{wheel_uid}' introuvable",
+            )
         if wheel.tenant_id is not None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cette wheel est déjà rattachée à un tenant")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cette wheel est déjà rattachée à un tenant",
+            )
         wheel.tenant_id = tenant_id
         wheel.status = "prepared"
         updated = await self._repo.update(wheel)
@@ -109,22 +125,34 @@ class WheelAdminService:
         """Détache une wheel de son tenant."""
         wheel = await WheelRepository(tenant_id=tenant_id).get(wheel_id)
         if not wheel:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Wheel {wheel_id} introuvable dans ce tenant")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Wheel {wheel_id} introuvable dans ce tenant",
+            )
         wheel.tenant_id = None
         wheel.box_id = None
         wheel.status = "in_stock"
         updated = await self._repo.update(wheel)
         return WheelResponse.from_model(updated)
 
-    async def mount(self, wheel_id: UUID, box_id: UUID, tenant_id: UUID) -> WheelResponse:
+    async def mount(
+        self, wheel_id: UUID, box_id: UUID, tenant_id: UUID
+    ) -> WheelResponse:
         """Monte une wheel sur une box (vérifie que la box appartient au tenant)."""
         from medbox.core.db.repositories.box import BoxRepository
+
         box = await BoxRepository(tenant_id=tenant_id).get(box_id)
         if not box:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Box {box_id} introuvable dans ce tenant")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Box {box_id} introuvable dans ce tenant",
+            )
         wheel = await WheelRepository(tenant_id=tenant_id).get(wheel_id)
         if not wheel:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Wheel {wheel_id} introuvable dans ce tenant")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Wheel {wheel_id} introuvable dans ce tenant",
+            )
         wheel.box_id = box_id
         wheel.status = "mounted"
         updated = await self._repo.update(wheel)
@@ -134,7 +162,10 @@ class WheelAdminService:
         """Démonte une wheel de sa box."""
         wheel = await WheelRepository(tenant_id=tenant_id).get(wheel_id)
         if not wheel:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Wheel {wheel_id} introuvable dans ce tenant")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Wheel {wheel_id} introuvable dans ce tenant",
+            )
         wheel.box_id = None
         wheel.status = "prepared"
         updated = await self._repo.update(wheel)
