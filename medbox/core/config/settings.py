@@ -70,6 +70,14 @@ class Settings(BaseSettings):
         default="/app/certs/worker.key", alias="EMQX_CLIENT_KEY"
     )
 
+    # --- Box monitoring ---
+    # Seuil (en minutes) au-dela duquel une box sans telemetry est consideree offline.
+    # Utilise par get_stats() et par la tache Celery monitor_boxes.
+    box_offline_threshold_minutes: int = Field(
+        default=10,
+        alias="BOX_OFFLINE_THRESHOLD_MINUTES",
+    )
+
     # --- Misc ---
     environment: str = "development"
 

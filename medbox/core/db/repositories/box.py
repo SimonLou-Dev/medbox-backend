@@ -9,6 +9,7 @@ from uuid import UUID
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import selectinload
 
+from medbox.core.config.settings import settings
 from medbox.core.db.models.box import Box
 from medbox.core.db.repositories.base import BaseRepository
 from medbox.core.db.session import async_session_local
@@ -54,7 +55,7 @@ class BoxRepository(BaseRepository[Box]):
         if not self.tenant_id:
             raise ValueError("tenant_id requis")
         now = datetime.now(tz=UTC)
-        threshold = now - timedelta(minutes=10)
+        threshold = now - timedelta(minutes=settings.box_offline_threshold_minutes)
         async with async_session_local() as session:
             row = (
                 await session.execute(
