@@ -33,6 +33,8 @@ def monitor_boxes(self) -> dict:
     async def _run() -> dict:
         from sqlalchemy import select
 
+        from medbox.api.ws.events import box_alert
+        from medbox.api.ws.manager import publish_to_tenant
         from medbox.core.db.models.box import Box
         from medbox.core.db.models.event import Event
         from medbox.core.db.session import async_session_local
@@ -40,21 +42,15 @@ def monitor_boxes(self) -> dict:
         now = datetime.now(tz=UTC)
         threshold_minutes = settings.box_offline_threshold_minutes
         offline_cutoff = now - timedelta(minutes=threshold_minutes)
-        # Un event 'box_offline' n'est emis qu'une fois par fenetre pour eviter
-        # le spam : on ne re-emet pas si un event identique existe deja apres
-        # la derniere telemetry.
         alerts: list[dict] = []
 
         async with async_session_local() as session:
-            result = await session.execute(
-                select(Box).where(Box.status == "active")
-            )
+            result = await session.execute(select(Box).where(Box.status == "active"))
             boxes = result.scalars().all()
 
             for box in boxes:
                 if box.last_seen_at is None:
                     continue
-                # Ne pas emettre d'event pour une box non rattachee a un tenant
                 if box.tenant_id is None:
                     continue
                 last_seen = box.last_seen_at
@@ -63,8 +59,6 @@ def monitor_boxes(self) -> dict:
                 if last_seen >= offline_cutoff:
                     continue
 
-                # Box offline : verifier qu'on n'a pas deja emis un event
-                # 'box_offline' depuis la derniere telemetry
                 existing = await session.execute(
                     select(Event)
                     .where(Event.box_id == box.id)
@@ -91,6 +85,7 @@ def monitor_boxes(self) -> dict:
                         "type": "box_offline",
                         "box_uid": box.box_uid,
                         "box_id": str(box.id),
+                        "tenant_id": str(box.tenant_id),
                         "last_seen_at": last_seen.isoformat(),
                     }
                 )
@@ -103,6 +98,20 @@ def monitor_boxes(self) -> dict:
 
             if alerts:
                 await session.commit()
+
+        # Notifier les soignants via WS pour chaque alerte
+        for alert in alerts:
+            try:
+                await publish_to_tenant(
+                    alert["tenant_id"],
+                    box_alert(
+                        alert["box_id"],
+                        "offline",
+                        f"Box {alert['box_uid']} hors ligne depuis {threshold_minutes} min",
+                    ),
+                )
+            except Exception as ws_exc:
+                logger.debug("WS publish failed (non-blocking) : %s", ws_exc)
 
         logger.info(
             "monitor_boxes : %d boxes verifiees, %d alertes",

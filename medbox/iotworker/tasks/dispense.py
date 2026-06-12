@@ -24,6 +24,7 @@ def handle_take_event(
     box_uid: str,
     schedule_item_id: str,
     taken_at_iso: str,
+    tenant_id: str | None = None,
 ) -> dict:
     """Traite la confirmation de distribution reçue depuis la medbox via MQTT.
 
@@ -34,11 +35,14 @@ def handle_take_event(
         box_uid: UID de la medbox
         schedule_item_id: UUID du PrescriptionScheduleItem concerné
         taken_at_iso: Horodatage ISO 8601 fourni par la medbox
+        tenant_id: UUID du tenant (pour notif WS)
     """
 
     async def _run() -> dict:
         from datetime import UTC, datetime
 
+        from medbox.api.ws.events import take_event as ws_take_event
+        from medbox.api.ws.manager import publish_to_tenant
         from medbox.core.db.repositories.prescription_schedule_item import (
             PrescriptionScheduleItemRepository,
         )
@@ -55,6 +59,16 @@ def handle_take_event(
         if not item:
             logger.warning("handle_take_event : item %s introuvable", schedule_item_id)
             return {"status": "skipped", "reason": "item_not_found"}
+
+        # Notifier le front via WS
+        if tenant_id:
+            try:
+                await publish_to_tenant(
+                    tenant_id,
+                    ws_take_event(box_uid, schedule_item_id, "taken"),
+                )
+            except Exception as ws_exc:
+                logger.debug("WS publish failed (non-blocking) : %s", ws_exc)
 
         logger.info(
             "Distribution confirmée : box=%s item=%s taken_at=%s",
@@ -87,8 +101,8 @@ def handle_error_event(
 ) -> dict:
     """Traite une erreur de distribution signalée par la medbox via MQTT.
 
-    Met à jour le PrescriptionScheduleItem → 'error' et passe la box
-    en statut 'maintenance'.
+    Met à jour le PrescriptionScheduleItem → 'error', passe la box
+    en statut 'maintenance' et notifie le front via WS.
 
     Args:
         box_uid: UID de la medbox en erreur
@@ -98,6 +112,9 @@ def handle_error_event(
     """
 
     async def _run() -> dict:
+        from medbox.api.ws.events import box_alert
+        from medbox.api.ws.events import take_event as ws_take_event
+        from medbox.api.ws.manager import publish_to_tenant
         from medbox.core.db.repositories.box import BoxRepository
         from medbox.core.db.repositories.prescription_schedule_item import (
             PrescriptionScheduleItemRepository,
@@ -123,6 +140,22 @@ def handle_error_event(
             logger.warning(
                 "Box %s passée en maintenance suite à erreur %s", box_uid, error_code
             )
+
+        # Notifier le front via WS
+        try:
+            events = [
+                box_alert(
+                    box_uid,
+                    "maintenance",
+                    f"Box {box_uid} en maintenance : {error_code}",
+                ),
+            ]
+            if schedule_item_id:
+                events.append(ws_take_event(box_uid, schedule_item_id, "error"))
+            for event in events:
+                await publish_to_tenant(tenant_id, event)
+        except Exception as ws_exc:
+            logger.debug("WS publish failed (non-blocking) : %s", ws_exc)
 
         return results
 

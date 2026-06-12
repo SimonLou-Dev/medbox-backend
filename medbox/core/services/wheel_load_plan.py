@@ -6,6 +6,7 @@ la répartition des médicaments dans les 21 cases utiles de la roue.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime, time, timedelta
 from uuid import UUID
 
@@ -30,6 +31,8 @@ from medbox.core.dto.wheel_load_plan import (
     WheelLoadPlanDetailResponse,
     WheelLoadPlanResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 # Cases utiles : indices 0 à 20 (case 22 = index 21 = vide, ignorée)
 USABLE_SLOT_COUNT = 21
@@ -474,6 +477,26 @@ class WheelLoadPlanService:
 
             await session.commit()
             await session.refresh(plan_obj)
+
+        # Notifier le soignant via WS
+        try:
+            from medbox.api.ws.events import action_success
+            from medbox.api.ws.manager import publish_to_user
+
+            await publish_to_user(
+                str(self.tenant_id),
+                str(user_id),
+                action_success(
+                    "Roue chargée et assignée à la medbox",
+                    {
+                        "plan_id": str(plan_obj.id),
+                        "box_id": str(box_id),
+                        "distributions_created": len(schedule_items),
+                    },
+                ),
+            )
+        except Exception as ws_exc:
+            logger.debug("WS publish failed (non-blocking) : %s", ws_exc)
 
         return WheelLoadPlanResponse(
             id=plan_obj.id,
