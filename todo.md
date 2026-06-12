@@ -11,10 +11,10 @@
 | ✅ | Documentation (architecture, readme) | 100% |
 | ✅ | Architecture multi-tenant + Auth (Keycloak/JWT) | 100% |
 | ✅ | CRUD entités (Box, Patient, Prescription, Wheel…) | 90% |
-| ✅ | IoT Worker (MQTT handlers + telemetry) | 75% |
-| ✅ | Scheduler Worker (dispatch + scheduling) | 70% |
+| ✅ | IoT Worker (MQTT handlers + telemetry) | 80% |
+| ✅ | Scheduler Worker (preload 2x/jour) | 90% |
+| ✅ | WheelLoadPlan — moulinette + distributions | 100% |
 | 🚧 | WebSockets (notifications + live updates) | 0% |
-| 🚧 | Tâches métier manquantes (pre-load + prescription→distribution) | 0% |
 | 🚧 | Tests & Coverage | 25% |
 | ⏳ | Déploiement & DevOps | 0% |
 | ⏳ | Admin Dashboard | 0% |
@@ -25,15 +25,24 @@
 
 ### IoT Worker
 - ✅ Connexion MQTT async (aiomqtt, mTLS)
-- ✅ `send_dispense_command` — publie `medbox/box/{uid}/cmd/dispense` QoS 2
-- ✅ `handle_take_event` — marque `PrescriptionScheduleItem` → `taken`
+- ✅ `handle_take_event` — marque `PrescriptionScheduleItem` → `taken` (confirmé par la medbox)
 - ✅ `handle_error_event` — marque item → `error`, box → `maintenance`
 - ✅ `telemetry.py` — RTC drift, stockage Telemetry/health, sync_time si drift >10min
 
 ### Scheduler Worker
-- ✅ `calculate_prescription_scheduling` — génère PrescriptionScheduleItems pour les 24h suivantes (fréquence times_per_day)
-- ✅ `dispatch_scheduled_takes` — toutes les 5 min, dispatch via Celery les items dus
-- ✅ `cleanup_job` — quotidien 02:00 UTC : expire invites, marque items missed, archive events
+- ✅ `preload_upcoming_distributions` — 2×/jour (08:00 + 20:00 UTC) : envoie les 3 prochaines distributions par box via MQTT `cmd/preload`
+- ✅ `cleanup_job` — quotidien 02:00 UTC : expire invitations périmées
+- ✅ `monitor_boxes` — toutes les 5 min : surveillance état boxes
+
+### WheelLoadPlan — Moulinette
+- ✅ `WheelLoadPlan` model (draft → confirmed → active → exhausted)
+- ✅ `WheelLoadPlanPrescription` — association plan ↔ ordonnances (plusieurs prescriptions par plan)
+- ✅ `WheelLoadPlanService.create()` — croise les ordonnances, calcule les 21 cases, retourne la liste de remplissage
+- ✅ `WheelLoadPlanService.confirm()` — soignant confirme le remplissage physique → crée les `PrescriptionScheduleItem` + monte la roue sur la box
+- ✅ `WheelLoadPlanRepository`
+- ✅ `PrescriptionScheduleItem` refactorisé : `wheel_slot_id` + `wheel_load_plan_id` (plus de `prescription_item_id` singulier)
+- ✅ Statuts PSI simplifiés : `pending | taken | error` (plus de `dispatched` ni `missed`)
+- ✅ Migration Alembic : `a1b2c3d4e5f6`
 
 ### API REST
 - ✅ Auth OAuth2 / Keycloak
@@ -46,10 +55,14 @@
 - ✅ GlobalMedication
 - ✅ Events (audit trail, filterable)
 - ✅ Health check
+- ✅ `GET /api/v1/wheel-load-plans` — liste des plans du tenant
+- ✅ `POST /api/v1/wheel-load-plans` — lance la moulinette, retourne la liste de remplissage
+- ✅ `GET /api/v1/wheel-load-plans/{id}` — récupère un plan avec sa liste de remplissage
+- ✅ `POST /api/v1/wheel-load-plans/{id}/confirm` — soignant confirme le remplissage physique
 
 ### DB / Core
-- ✅ Modèles : Tenant, User, Patient, Box, Wheel, WheelSlot, Prescription, PrescriptionItem, PrescriptionScheduleItem, Event, Telemetry, GlobalMedication, Invitation
-- ✅ 13 repositories avec tenant scoping
+- ✅ Modèles : Tenant, User, Patient, Box, Wheel, WheelSlot, WheelSlotPrescriptionItem, Prescription, PrescriptionItem, PrescriptionScheduleItem, WheelLoadPlan, WheelLoadPlanPrescription, Event, Telemetry, GlobalMedication, Invitation
+- ✅ Repositories (15) avec tenant scoping
 - ✅ Chiffrement PII (Fernet, champs `c_*`)
 - ✅ RBAC (rôles par tenant)
 
@@ -57,168 +70,62 @@
 
 ## 🚧 À implémenter — PRIORITÉ HAUTE
 
-### 1. Pre-load distributions vers les medboxes — **NOUVEAU**
+### 1. WebSocket — Notifications UX utilisateur
 
-**Responsabilité**: 2× par jour, envoyer à chaque medbox les 3 prochaines distributions prévues, pour qu'elle puisse fonctionner en mode offline.
-
-#### Sous-tâches
-
-- [ ] **Job Scheduler** `preload_upcoming_distributions`
-  - [ ] Requête : pour chaque box active, récupérer les 3 prochains `PrescriptionScheduleItem` (status=`pending`, scheduled_at > now, triés ASC)
-  - [ ] Formatter payload MQTT (liste des 3 prochaines : prescription_id, slot_id, scheduled_at, medications)
-  - [ ] Publier `medbox/box/{box_id}/cmd/preload` avec QoS 1
-  - [ ] Logger le résultat par box
-  - [ ] Fréquence : 2× par jour (ex. 08:00 et 20:00 UTC)
-  - [ ] Gérer les boxes offline (skip + log, pas d'erreur critique)
-
-- [ ] **Payload MQTT** format `preload`
-  - [ ] Définir schéma JSON du payload (à aligner avec firmware)
-  - [ ] Validation Pydantic avant envoi
-
-- [ ] **Tests**
-  - [ ] Test calcul des 3 prochains items par box
-  - [ ] Test skip box offline
-  - [ ] Test publication MQTT (mock)
-
-**Fichiers** : `medbox/schedulerworker/tasks/preload.py` (à créer), `medbox/iotworker/tasks/` (payload helpers)
-
----
-
-### 2. Tâche asynchrone : Prescription → Distributions — **NOUVEAU**
-
-**Responsabilité**: **Seul moyen de créer des distributions.** Le soignant sélectionne des ordonnances, le système choisit une roue en stock, le soignant choisit la medbox cible, puis le système calcule les `PrescriptionScheduleItem` en tenant compte des 22 cases (21 utiles) de la medbox.
-
-> ⚠️ Le job `calculate_prescription_scheduling` existant NE crée PAS de distributions — il est à revoir/supprimer ou cantonner à un rôle différent. Toutes les distributions passent obligatoirement par ce flux.
-
-#### Flux métier
-
-```
-Soignant sélectionne ordonnances
-        ↓
-API valide + identifie roues disponibles en stock
-        ↓
-Soignant choisit la medbox cible
-        ↓
-Tâche Celery : calcule les distributions
-  - 21 cases utiles dans la medbox
-  - Chaque case = 1 médicament sur 1 créneau horaire
-  - Répartition selon fréquence prescription (times_per_day)
-        ↓
-PrescriptionScheduleItems créés en DB
-        ↓
-Notification WS → soignant : "Distributions générées"
-```
-
-#### Sous-tâches
-
-- [ ] **Endpoint API** `POST /api/v1/prescriptions/generate-distributions`
-  - [ ] Body : `{ prescription_ids: [], box_id: uuid }`
-  - [ ] Auth : soignant authentifié, tenant scoping obligatoire
-  - [ ] Vérifier que la box appartient au tenant
-  - [ ] Identifier les roues disponibles en stock pour ces prescriptions
-  - [ ] Retour immédiat `{ task_id }` — traitement async Celery
-  - [ ] Notification WS à la fin (voir §3)
-
-- [ ] **Endpoint API** `GET /api/v1/prescriptions/available-wheels`
-  - [ ] Retourne les roues en stock compatibles avec les prescriptions sélectionnées
-  - [ ] Utilisé par le front pour présenter le choix à l'utilisateur avant soumission
-
-- [ ] **Tâche Celery** `generate_distributions_for_prescriptions(prescription_ids, box_id, wheel_id, tenant_id)`
-  - [ ] Valider appartenance tenant (prescriptions, box, roue)
-  - [ ] Récupérer les 21 cases utiles de la medbox
-  - [ ] Calculer la répartition des prises selon fréquence (times_per_day × durée prescription)
-  - [ ] Mapper chaque prise → case disponible (slot assignment)
-  - [ ] Créer les `PrescriptionScheduleItem` (idempotent : skip si créneau déjà occupé)
-  - [ ] Assigner la roue à la box en DB
-  - [ ] Retourner : nb items créés, nb cases utilisées / 21, conflits éventuels
-  - [ ] Publier event Redis → WS notification soignant
-
-- [ ] **Logique cases (21 utiles sur 22)**
-  - [ ] Modéliser "capacité restante" d'une medbox (cases libres)
-  - [ ] Gérer conflits si cases insuffisantes pour toutes les prescriptions
-  - [ ] Alerter si remplissage > 90% des cases
-
-- [ ] **Revoir `calculate_prescription_scheduling`**
-  - [ ] Clarifier son rôle si les distributions ne passent plus par lui
-  - [ ] Option A : le supprimer
-  - [ ] Option B : le garder pour re-planifier les items `missed` automatiquement
-
-- [ ] **Tests**
-  - [ ] Test flux complet (prescriptions → roue → box → items créés)
-  - [ ] Test calcul répartition 21 cases (cas nominal, cas saturé)
-  - [ ] Test idempotence (appel 2× = même résultat, pas de doublons)
-  - [ ] Test prescription d'un autre tenant → 403
-  - [ ] Test box inexistante → 404
-  - [ ] Test capacité dépassée → erreur métier claire
-
-**Fichiers** :
-- `medbox/api/routes/v1/prescription.py` — nouveaux endpoints
-- `medbox/schedulerworker/tasks/distributions.py` (à créer) — logique calcul
-- `medbox/core/services/distribution.py` (à créer) — slot assignment, capacité
-
----
-
-### 3. WebSocket — Notifications UX utilisateur — **NOUVEAU**
-
-**Responsabilité**: Confirmer les actions du soignant en temps réel (feedback immédiat type toast/snackbar) et signaler les alertes importantes. **Usage principal : retour d'action, pas monitoring continu.**
+**Responsabilité**: Confirmer les actions du soignant en temps réel (feedback type toast/snackbar) et signaler les alertes importantes.
 
 #### Exemples de notifications attendues
-- "Distributions générées avec succès" (fin §2)
-- "Medbox assignée" (roue chargée confirmée)
+- "Plan de chargement créé" / "Roue assignée à la medbox"
 - "Sauvegardé" (mise à jour prescription, config box…)
-- "Erreur : case insuffisante" (échec génération distributions)
+- "Erreur : roue non disponible"
 - "Alerte : batterie critique sur Box #42"
-- "Alerte : Box #12 hors ligne"
+- "Alerte : Box #12 en maintenance (roue bloquée)"
 
 #### Sous-tâches
 
-- [ ] **Setup WebSocket** (FastAPI natif — suffisant pour ce cas d'usage)
+- [ ] **Setup WebSocket** (FastAPI natif)
   - [ ] Endpoint : `ws://api/v1/ws/notifications?token=<jwt>`
   - [ ] Auth JWT sur handshake (rejeter si token invalide)
   - [ ] Tenant isolation : un utilisateur ne reçoit que les events de son tenant
 
-- [ ] **Connection Manager**
-  - [ ] Registre connexions actives : `{ tenant_id → { user_id → [ws_connections] } }`
-  - [ ] `notify_user(user_id, event)` — notif ciblée 1 utilisateur
-  - [ ] `broadcast_tenant(tenant_id, event)` — broadcast tous les soignants du tenant
-  - [ ] Gestion déconnexion propre + heartbeat
+- [ ] **Connection Manager** (`medbox/api/ws/manager.py`)
+  - [ ] Registre connexions : `{ tenant_id → { user_id → [ws_connections] } }`
+  - [ ] `notify_user(user_id, event)` — notif ciblée
+  - [ ] `broadcast_tenant(tenant_id, event)` — tous les soignants du tenant
+  - [ ] Gestion déconnexion propre + heartbeat ping/pong
 
 - [ ] **Types de notifications**
-  - [ ] `ACTION_SUCCESS` — confirmation action soignant (distributions créées, box assignée, sauvegarde)
-  - [ ] `ACTION_ERROR` — échec action soignant avec message d'erreur lisible
+  - [ ] `ACTION_SUCCESS` — confirmation action soignant
+  - [ ] `ACTION_ERROR` — échec avec message lisible
   - [ ] `BOX_ALERT` — alerte box (offline, batterie critique, maintenance)
-  - [ ] `TAKE_EVENT` — prise effectuée ou en erreur (informatif, pas bloquant)
+  - [ ] `TAKE_EVENT` — distribution confirmée ou en erreur (informatif)
 
-- [ ] **Intégration**
-  - [ ] Celery tasks (§2) → publie sur Redis channel → WS broadcast
-  - [ ] IoT Worker (`handle_error_event`, `telemetry.py`) → Redis → WS broadcast
+- [ ] **Intégration workers**
+  - [ ] `handle_error_event` + `telemetry.py` → Redis pub/sub → WS broadcast
+  - [ ] `WheelLoadPlanService.confirm()` → notif "Roue assignée"
 
 - [ ] **Tests**
   - [ ] Test connexion / auth invalide → rejet
   - [ ] Test isolation tenant
-  - [ ] Test réception notification après action (mock Celery → WS)
+  - [ ] Test broadcast après action
 
-**Fichiers** : `medbox/api/ws/` (à créer), `medbox/api/ws/manager.py`, `medbox/api/routes/v1/ws.py`
+**Fichiers** : `medbox/api/ws/manager.py` (à créer), `medbox/api/routes/v1/ws.py` (à créer)
 
 ---
 
-### 4. WebSocket — Live updates dashboard — **NOUVEAU**
+### 2. WebSocket — Live updates dashboard
 
-**Responsabilité**: Flux pour mettre à jour certaines vues du dashboard sans re-fetch complet (état box, liste distributions). Secondaire par rapport à §3 — évaluer si SSE suffit.
+**Responsabilité**: Mise à jour de certaines vues sans re-fetch REST complet.
 
-#### Périmètre (à affiner selon besoins front)
+> ⚠️ À décider avec le front : si polling REST toutes les 30s suffit, déprioriser.
 
-- [ ] État live d'une box : `{box_id, status, battery_level, last_seen}` — utile sur la page détail box
-- [ ] Changement statut distribution : `{item_id, status, taken_at}` — utile sur le planning
-- [ ] Events récents d'une box — utile sur le détail box
-
-> **Note** : si le front fait juste du polling REST toutes les 30s, ce §4 peut être dépriorisé / mis en backlog. À décider avec l'équipe front.
-
-- [ ] Canaux : `ws://api/v1/ws/boxes/{box_id}/live` et `ws://api/v1/ws/distributions/live`
-- [ ] Partage de l'infrastructure WS avec §3 (même Connection Manager)
+- [ ] État live d'une box : `{status, battery_level, last_seen}` — page détail box
+- [ ] Changement statut distribution : `{item_id, status, taken_at}` — page planning
+- [ ] Canaux : `ws://api/v1/ws/boxes/{box_id}/live` + `ws://api/v1/ws/distributions/live`
+- [ ] Partage infrastructure WS avec §1 (même Connection Manager)
 - [ ] SSE en alternative si unidirectionnel suffit
 
-**Fichiers** : partagé avec §3 — `medbox/api/ws/`
+**Fichiers** : partagé avec §1 — `medbox/api/ws/`
 
 ---
 
@@ -226,7 +133,7 @@ Notification WS → soignant : "Distributions générées"
 
 ### Tests & Coverage — Objectif 80%+
 
-**Coverage actuelle** : ~25% (crypto, API multi-tenant, modèles de base)
+**Coverage actuelle** : ~25%
 
 #### Tests existants ✅
 ```
@@ -241,27 +148,25 @@ tests/
 ├── test_prescription.py
 ├── test_admin.py
 ├── test_invitation.py
-└── ... (14 fichiers total)
+└── ... (14 fichiers total, 119 tests)
 ```
 
 #### À ajouter
-- [ ] Tests endpoints WebSocket (§3 et §4)
-- [ ] Tests tâche `generate_distributions_for_prescriptions` (§2)
-- [ ] Tests job `preload_upcoming_distributions` (§1)
+- [ ] `test_wheel_load_plan.py` — moulinette (cas nominal, cas saturé >21 cases, prescriptions incompatibles)
+- [ ] `test_wheel_load_plan.py` — confirm (PSI créés, roue montée, statut plan)
+- [ ] `test_preload.py` — job preload (3 items par box, skip box sans items, mock MQTT)
+- [ ] Tests WebSocket (§1 et §2 ci-dessus)
 - [ ] Tests services : `security.py`, `tenant.py`, `tenant_right.py`
-- [ ] Tests repositories : base CRUD, tenant scoping, soft deletes
+- [ ] Tests repositories : CRUD, tenant scoping, soft deletes
 - [ ] Integration test : multi-tenant isolation end-to-end
-- [ ] Tests schedulerworker : idempotence, error/retry
 
 ---
 
 ### API — Endpoints manquants
 
-- [ ] `POST /api/v1/prescriptions/generate-distributions` (voir §2)
-- [ ] `GET /api/v1/tasks/{task_id}/status` — polling état tâche Celery
+- [ ] `GET /api/v1/wheels?status=in_stock` — roues disponibles en stock (utilisé avant création WheelLoadPlan)
 - [ ] `GET /api/v1/alerts` — alertes actives
 - [ ] `PATCH /api/v1/alerts/{id}` — acquittement alerte
-- [ ] `POST /api/v1/boxes/{id}/dispense` — déclenchement manuel prise
 
 ---
 
@@ -299,7 +204,7 @@ tests/
 
 ### High
 - [ ] **Keycloak** : claim `tenant_id` dans JWT à vérifier conforme
-- [ ] **Scheduler persistence** : état job si worker crash non géré
+- [ ] **Preload payload** : format exact du JSON `cmd/preload` à aligner avec le firmware
 
 ### Medium
 - [ ] **API error handling** : format réponse erreur inconsistant
@@ -312,15 +217,15 @@ tests/
 
 ### Milestone 1 — MVP (Juillet 2026)
 - ✅ Architecture + Auth + CRUD entités
-- ✅ IoT Worker + Scheduler Worker de base
-- 🚧 WebSockets notifications (§3 minimal)
-- 🚧 Pre-load distributions (§1)
+- ✅ IoT Worker (take/error events)
+- ✅ WheelLoadPlan + moulinette + distributions
+- ✅ Preload 2x/jour vers les medboxes
+- 🚧 WebSockets notifications (§1 minimal)
 - 🚧 Tests 50%+
 - ⏳ Docker Compose dev complet
 
 ### Milestone 2 — Beta (Septembre 2026)
-- [ ] WebSockets live updates complets (§4)
-- [ ] Tâche prescription→distributions (§2)
+- [ ] WebSockets live updates complets (§2)
 - [ ] Tests 80%+
 - [ ] Kubernetes manifests
 - [ ] Monitoring & alerting
@@ -337,9 +242,9 @@ tests/
 ## 📞 Questions ouvertes
 
 1. **WebSocket vs SSE** : SSE suffit pour les live updates (unidirectionnel) ? ou besoin de bi-directionnel ?
-2. **Pre-load payload** : format exact du payload `preload` à aligner avec le firmware des medboxes
-3. **Celery task status** : polling REST ou WebSocket pour informer le front de l'avancement de `generate_distributions` ?
-4. **Reconnexion WS** : stocker les events dans Redis pour replay ? quelle durée de rétention ?
+2. **Preload payload** : format exact du JSON `cmd/preload` à aligner avec firmware medbox
+3. **Reconnexion WS** : stocker les events dans Redis pour replay ? quelle durée de rétention ?
+4. **Roues en stock** : comment le soignant sélectionne-t-il la roue avant de créer le plan ? (endpoint `/wheels?status=in_stock` à ajouter)
 5. **Keycloak tenant_id claim** : custom mapper confirmé ou alternative ?
 6. **Admin dashboard** : requis pour MVP ou backlog ?
 
