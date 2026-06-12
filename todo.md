@@ -1,6 +1,6 @@
 # 📋 TODO MEDBOX - Roadmap & Tâches en cours
 
-**Date**: Décembre 2025 | **Version**: 0.1.0
+**Date**: Juin 2026 | **Version**: 0.1.0
 
 ---
 
@@ -9,569 +9,350 @@
 | Statut | Tâches | % Complet |
 |--------|--------|----------|
 | ✅ | Documentation (architecture, readme) | 100% |
-| 🚧 | IoT Worker | 10% |
-| 🚧 | Scheduler Worker | 15% |
-| 🚧 | Tests & Coverage | 20% |
+| ✅ | Architecture multi-tenant + Auth (Keycloak/JWT) | 100% |
+| ✅ | CRUD entités (Box, Patient, Prescription, Wheel…) | 90% |
+| ✅ | IoT Worker (MQTT handlers + telemetry) | 75% |
+| ✅ | Scheduler Worker (dispatch + scheduling) | 70% |
+| 🚧 | WebSockets (notifications + live updates) | 0% |
+| 🚧 | Tâches métier manquantes (pre-load + prescription→distribution) | 0% |
+| 🚧 | Tests & Coverage | 25% |
 | ⏳ | Déploiement & DevOps | 0% |
 | ⏳ | Admin Dashboard | 0% |
 
 ---
 
-## 🚧 En cours d'implémentation
+## ✅ Implémenté (état réel juin 2026)
 
-URGENT : Test de test_patient.py test_global_medication.py
+### IoT Worker
+- ✅ Connexion MQTT async (aiomqtt, mTLS)
+- ✅ `send_dispense_command` — publie `medbox/box/{uid}/cmd/dispense` QoS 2
+- ✅ `handle_take_event` — marque `PrescriptionScheduleItem` → `taken`
+- ✅ `handle_error_event` — marque item → `error`, box → `maintenance`
+- ✅ `telemetry.py` — RTC drift, stockage Telemetry/health, sync_time si drift >10min
 
-### 1. IoT Worker (MQTT → DB) — **PRIORITÉ: HAUTE**
+### Scheduler Worker
+- ✅ `calculate_prescription_scheduling` — génère PrescriptionScheduleItems pour les 24h suivantes (fréquence times_per_day)
+- ✅ `dispatch_scheduled_takes` — toutes les 5 min, dispatch via Celery les items dus
+- ✅ `cleanup_job` — quotidien 02:00 UTC : expire invites, marque items missed, archive events
 
-**Responsabilité**: Subscribe `medbox/box/+/evt/#`, valider, écrire en DB, déclencher actions.
+### API REST
+- ✅ Auth OAuth2 / Keycloak
+- ✅ Tenant, User, Invitation
+- ✅ Patient CRUD
+- ✅ Box CRUD + stats + telemetry
+- ✅ Box Admin (configure, reset)
+- ✅ Prescription CRUD
+- ✅ Wheel + WheelSlot
+- ✅ GlobalMedication
+- ✅ Events (audit trail, filterable)
+- ✅ Health check
 
-#### Sous-tâches
-
-- [ ] **Connexion MQTT**
-  - [ ] Config broker MQTT (host, port, certs mTLS)
-  - [ ] Connexion async (paho-mqtt ou aiohttp)
-  - [ ] Reconnexion automatique + backoff
-  - [ ] Logging connexion/déconnexion
-
-- [ ] **Event Handlers** (créer dans `iotworker/tasks/`)
-  - [ ] `handle_take` — Prise effectuée
-    - [ ] Valider payload (box_id, prescription_id, timestamp)
-    - [ ] Insérer `Event` record
-    - [ ] Update `Prescription` status → `taken`
-    - [ ] Optionnel: notifier frontend (webhook)
-  - [ ] `handle_error` — Erreur prise
-    - [ ] Valider error_code (WHEEL_STUCK, TIMEOUT, etc.)
-    - [ ] Insérer `Event` record status=error
-    - [ ] Update `Box` status → `maintenance_needed`
-    - [ ] Alerte soignant (notification, email?)
-  - [ ] `handle_door_open` — Porte ouverte détectée
-    - [ ] Insérer audit event
-    - [ ] Update box status
-  - [ ] `handle_medication_fall` — Chute médicament
-    - [ ] Insérer event
-    - [ ] Alert: checker dispensation précédente
-  - [ ] `handle_telemetry` — Telemetry box (batterie, temp, etc.)
-    - [ ] Insérer `Telemetry` record
-    - [ ] Vérifier seuils (batterie < 20%?)
-    - [ ] Alerte si seuil critique
-
-- [ ] **Publishing commandes** (MQTT → box)
-  - [ ] Endpoint API: POST `/api/v1/boxes/{box_id}/dispense`
-  - [ ] Générer payload commande
-  - [ ] Publier `medbox/box/{box_id}/cmd/dispense`
-  - [ ] QoS 2 (exactement une fois)
-  - [ ] Timeout + retry logic
-
-- [ ] **Tests IoT Worker**
-  - [ ] Mock MQTT broker
-  - [ ] Test each handler (payload valid/invalid)
-  - [ ] Test DB writes
-  - [ ] Test error cases
-
-**Fichiers clés**:
-- `medbox/iotworker/main.py` — Point d'entrée
-- `medbox/iotworker/broker.py` — Config MQTT
-- `medbox/iotworker/tasks/` — Handlers événements
-- `core/db/models/event.py` — Event model
-
-**Blockers**: ❌ Authentification MQTT (certificats mTLS) pas testée en dev
+### DB / Core
+- ✅ Modèles : Tenant, User, Patient, Box, Wheel, WheelSlot, Prescription, PrescriptionItem, PrescriptionScheduleItem, Event, Telemetry, GlobalMedication, Invitation
+- ✅ 13 repositories avec tenant scoping
+- ✅ Chiffrement PII (Fernet, champs `c_*`)
+- ✅ RBAC (rôles par tenant)
 
 ---
 
-### 2. Scheduler Worker (Tâches planifiées) — **PRIORITÉ: HAUTE**
+## 🚧 À implémenter — PRIORITÉ HAUTE
 
-**Responsabilité**: Calcul plannings, déclenchement prises, nettoyage, surveillance.
+### 1. Pre-load distributions vers les medboxes — **NOUVEAU**
+
+**Responsabilité**: 2× par jour, envoyer à chaque medbox les 3 prochaines distributions prévues, pour qu'elle puisse fonctionner en mode offline.
 
 #### Sous-tâches
 
-- [ ] **Configuration Dramatiq**
-  - [ ] Broker Redis setup + tests
-  - [ ] Worker startup/shutdown clean
-  - [ ] Logging structure (structlog)
-  - [ ] Error handling + retries
+- [ ] **Job Scheduler** `preload_upcoming_distributions`
+  - [ ] Requête : pour chaque box active, récupérer les 3 prochains `PrescriptionScheduleItem` (status=`pending`, scheduled_at > now, triés ASC)
+  - [ ] Formatter payload MQTT (liste des 3 prochaines : prescription_id, slot_id, scheduled_at, medications)
+  - [ ] Publier `medbox/box/{box_id}/cmd/preload` avec QoS 1
+  - [ ] Logger le résultat par box
+  - [ ] Fréquence : 2× par jour (ex. 08:00 et 20:00 UTC)
+  - [ ] Gérer les boxes offline (skip + log, pas d'erreur critique)
 
-- [ ] **Job: Calcul planning prise** (`calculate_prescription_scheduling`)
-  - [ ] Lire toutes prescriptions actives
-  - [ ] Pour chaque prescription:
-    - [ ] Récupérer pattern prise (intervalle heures, days_of_week)
-    - [ ] Calculer prochaine prise (T + intervalle)
-    - [ ] Créer `PrescriptionScheduleItem` en DB
-  - [ ] Idempotence: rappels multiples = même résultat
-  - [ ] Fréquence: Chaque heure (ou configurable)
-  - [ ] Logs: Compteur items créés
+- [ ] **Payload MQTT** format `preload`
+  - [ ] Définir schéma JSON du payload (à aligner avec firmware)
+  - [ ] Validation Pydantic avant envoi
 
-- [ ] **Job: Déclenchement prise** (`dispatch_scheduled_take`)
-  - [ ] Requête DB: Prises dues (time <= NOW)
-  - [ ] Pour chaque prise:
-    - [ ] Récupérer patient, prescription, medications
-    - [ ] Générer commande MQTT
-    - [ ] Publier `medbox/box/{box_id}/cmd/dispense`
-    - [ ] Update statut → `dispatched`
-  - [ ] Fréquence: Toutes les 5 minutes
-  - [ ] Timeout: 30s (retry si pas ACK)
+- [ ] **Tests**
+  - [ ] Test calcul des 3 prochains items par box
+  - [ ] Test skip box offline
+  - [ ] Test publication MQTT (mock)
 
-- [ ] **Job: Surveillance boxes** (`monitor_boxes`)
-  - [ ] Requête: Boxes offline (last_heartbeat > 15 min)
-  - [ ] Requête: Batterie critique (< 10%)
-  - [ ] Requête: Roue bloquée (status maintenance)
-  - [ ] Créer `Alert` pour chaque anomalie
-  - [ ] Fréquence: Toutes les 5 minutes
-
-- [ ] **Job: Nettoyage** (`cleanup_job`)
-  - [ ] Supprimer invitations expirées (> 30 jours)
-  - [ ] Archiver events anciens (> 1 an? configurable)
-  - [ ] Nettoyer sessions expirées
-  - [ ] Fréquence: Quotidien 02:00 UTC
-
-- [ ] **Job: Agrégation métriques** (`aggregate_metrics`)
-  - [ ] Résumé journalier prises par tenant
-  - [ ] Compteur erreurs par type
-  - [ ] Taux succès box (%)
-  - [ ] Batterie moyenne boxes
-  - [ ] Persister dans table `DailyMetric`
-  - [ ] Fréquence: Quotidien 03:00 UTC
-
-- [ ] **Tests Scheduler**
-  - [ ] Mock Dramatiq broker
-  - [ ] Test job execution (DB side effects)
-  - [ ] Test idempotence
-  - [ ] Test error/retry scenarios
-  - [ ] Integration test avec vrai Redis? (CI env)
-
-**Fichiers clés**:
-- `medbox/schedulerworker/main.py` — Point d'entrée
-- `medbox/schedulerworker/broker.py` — Config Dramatiq
-- `medbox/schedulerworker/tasks/` — Job definitions
-- `core/db/models/prescription.py` — Prescription model
-- `core/services/tenant.py` — Tenant context
-
-**Blockers**: ❌ Schema DB pour schedule_items pas clear (voir `docs/database.md`)
+**Fichiers** : `medbox/schedulerworker/tasks/preload.py` (à créer), `medbox/iotworker/tasks/` (payload helpers)
 
 ---
 
-## 🧪 Tests & Coverage — **PRIORITÉ: HAUTE**
+### 2. Tâche asynchrone : Prescription → Distributions — **NOUVEAU**
 
-**Objectif**: 80%+ couverture code
+**Responsabilité**: **Seul moyen de créer des distributions.** Le soignant sélectionne des ordonnances, le système choisit une roue en stock, le soignant choisit la medbox cible, puis le système calcule les `PrescriptionScheduleItem` en tenant compte des 22 cases (21 utiles) de la medbox.
 
-### Tests existants ✅
+> ⚠️ Le job `calculate_prescription_scheduling` existant NE crée PAS de distributions — il est à revoir/supprimer ou cantonner à un rôle différent. Toutes les distributions passent obligatoirement par ce flux.
 
+#### Flux métier
+
+```
+Soignant sélectionne ordonnances
+        ↓
+API valide + identifie roues disponibles en stock
+        ↓
+Soignant choisit la medbox cible
+        ↓
+Tâche Celery : calcule les distributions
+  - 21 cases utiles dans la medbox
+  - Chaque case = 1 médicament sur 1 créneau horaire
+  - Répartition selon fréquence prescription (times_per_day)
+        ↓
+PrescriptionScheduleItems créés en DB
+        ↓
+Notification WS → soignant : "Distributions générées"
+```
+
+#### Sous-tâches
+
+- [ ] **Endpoint API** `POST /api/v1/prescriptions/generate-distributions`
+  - [ ] Body : `{ prescription_ids: [], box_id: uuid }`
+  - [ ] Auth : soignant authentifié, tenant scoping obligatoire
+  - [ ] Vérifier que la box appartient au tenant
+  - [ ] Identifier les roues disponibles en stock pour ces prescriptions
+  - [ ] Retour immédiat `{ task_id }` — traitement async Celery
+  - [ ] Notification WS à la fin (voir §3)
+
+- [ ] **Endpoint API** `GET /api/v1/prescriptions/available-wheels`
+  - [ ] Retourne les roues en stock compatibles avec les prescriptions sélectionnées
+  - [ ] Utilisé par le front pour présenter le choix à l'utilisateur avant soumission
+
+- [ ] **Tâche Celery** `generate_distributions_for_prescriptions(prescription_ids, box_id, wheel_id, tenant_id)`
+  - [ ] Valider appartenance tenant (prescriptions, box, roue)
+  - [ ] Récupérer les 21 cases utiles de la medbox
+  - [ ] Calculer la répartition des prises selon fréquence (times_per_day × durée prescription)
+  - [ ] Mapper chaque prise → case disponible (slot assignment)
+  - [ ] Créer les `PrescriptionScheduleItem` (idempotent : skip si créneau déjà occupé)
+  - [ ] Assigner la roue à la box en DB
+  - [ ] Retourner : nb items créés, nb cases utilisées / 21, conflits éventuels
+  - [ ] Publier event Redis → WS notification soignant
+
+- [ ] **Logique cases (21 utiles sur 22)**
+  - [ ] Modéliser "capacité restante" d'une medbox (cases libres)
+  - [ ] Gérer conflits si cases insuffisantes pour toutes les prescriptions
+  - [ ] Alerter si remplissage > 90% des cases
+
+- [ ] **Revoir `calculate_prescription_scheduling`**
+  - [ ] Clarifier son rôle si les distributions ne passent plus par lui
+  - [ ] Option A : le supprimer
+  - [ ] Option B : le garder pour re-planifier les items `missed` automatiquement
+
+- [ ] **Tests**
+  - [ ] Test flux complet (prescriptions → roue → box → items créés)
+  - [ ] Test calcul répartition 21 cases (cas nominal, cas saturé)
+  - [ ] Test idempotence (appel 2× = même résultat, pas de doublons)
+  - [ ] Test prescription d'un autre tenant → 403
+  - [ ] Test box inexistante → 404
+  - [ ] Test capacité dépassée → erreur métier claire
+
+**Fichiers** :
+- `medbox/api/routes/v1/prescription.py` — nouveaux endpoints
+- `medbox/schedulerworker/tasks/distributions.py` (à créer) — logique calcul
+- `medbox/core/services/distribution.py` (à créer) — slot assignment, capacité
+
+---
+
+### 3. WebSocket — Notifications UX utilisateur — **NOUVEAU**
+
+**Responsabilité**: Confirmer les actions du soignant en temps réel (feedback immédiat type toast/snackbar) et signaler les alertes importantes. **Usage principal : retour d'action, pas monitoring continu.**
+
+#### Exemples de notifications attendues
+- "Distributions générées avec succès" (fin §2)
+- "Medbox assignée" (roue chargée confirmée)
+- "Sauvegardé" (mise à jour prescription, config box…)
+- "Erreur : case insuffisante" (échec génération distributions)
+- "Alerte : batterie critique sur Box #42"
+- "Alerte : Box #12 hors ligne"
+
+#### Sous-tâches
+
+- [ ] **Setup WebSocket** (FastAPI natif — suffisant pour ce cas d'usage)
+  - [ ] Endpoint : `ws://api/v1/ws/notifications?token=<jwt>`
+  - [ ] Auth JWT sur handshake (rejeter si token invalide)
+  - [ ] Tenant isolation : un utilisateur ne reçoit que les events de son tenant
+
+- [ ] **Connection Manager**
+  - [ ] Registre connexions actives : `{ tenant_id → { user_id → [ws_connections] } }`
+  - [ ] `notify_user(user_id, event)` — notif ciblée 1 utilisateur
+  - [ ] `broadcast_tenant(tenant_id, event)` — broadcast tous les soignants du tenant
+  - [ ] Gestion déconnexion propre + heartbeat
+
+- [ ] **Types de notifications**
+  - [ ] `ACTION_SUCCESS` — confirmation action soignant (distributions créées, box assignée, sauvegarde)
+  - [ ] `ACTION_ERROR` — échec action soignant avec message d'erreur lisible
+  - [ ] `BOX_ALERT` — alerte box (offline, batterie critique, maintenance)
+  - [ ] `TAKE_EVENT` — prise effectuée ou en erreur (informatif, pas bloquant)
+
+- [ ] **Intégration**
+  - [ ] Celery tasks (§2) → publie sur Redis channel → WS broadcast
+  - [ ] IoT Worker (`handle_error_event`, `telemetry.py`) → Redis → WS broadcast
+
+- [ ] **Tests**
+  - [ ] Test connexion / auth invalide → rejet
+  - [ ] Test isolation tenant
+  - [ ] Test réception notification après action (mock Celery → WS)
+
+**Fichiers** : `medbox/api/ws/` (à créer), `medbox/api/ws/manager.py`, `medbox/api/routes/v1/ws.py`
+
+---
+
+### 4. WebSocket — Live updates dashboard — **NOUVEAU**
+
+**Responsabilité**: Flux pour mettre à jour certaines vues du dashboard sans re-fetch complet (état box, liste distributions). Secondaire par rapport à §3 — évaluer si SSE suffit.
+
+#### Périmètre (à affiner selon besoins front)
+
+- [ ] État live d'une box : `{box_id, status, battery_level, last_seen}` — utile sur la page détail box
+- [ ] Changement statut distribution : `{item_id, status, taken_at}` — utile sur le planning
+- [ ] Events récents d'une box — utile sur le détail box
+
+> **Note** : si le front fait juste du polling REST toutes les 30s, ce §4 peut être dépriorisé / mis en backlog. À décider avec l'équipe front.
+
+- [ ] Canaux : `ws://api/v1/ws/boxes/{box_id}/live` et `ws://api/v1/ws/distributions/live`
+- [ ] Partage de l'infrastructure WS avec §3 (même Connection Manager)
+- [ ] SSE en alternative si unidirectionnel suffit
+
+**Fichiers** : partagé avec §3 — `medbox/api/ws/`
+
+---
+
+## 🚧 À compléter — PRIORITÉ MOYENNE
+
+### Tests & Coverage — Objectif 80%+
+
+**Coverage actuelle** : ~25% (crypto, API multi-tenant, modèles de base)
+
+#### Tests existants ✅
 ```
 tests/
-├── test_crypto.py          — Chiffrement/déchiffrement
-├── test_encrypted_type.py  — Type SQLAlchemy custom
-└── test_encrypted_update.py — Update champs chiffrés
+├── test_crypto.py
+├── test_encrypted_type.py
+├── test_encrypted_update.py
+├── test_patient.py
+├── test_global_medication.py
+├── test_box.py
+├── test_wheel.py
+├── test_prescription.py
+├── test_admin.py
+├── test_invitation.py
+└── ... (14 fichiers total)
 ```
 
-**Coverage**: ~15% (surtout crypto/utils)
-
-### À ajouter
-
-#### API Tests
-
-- [ ] **Health endpoint**
-  - [ ] GET /health → 200 OK
-
-- [ ] **Tenant endpoints**
-  - [ ] POST /api/v1/tenants — Create tenant
-  - [ ] GET /api/v1/tenants/{id} — Get tenant (auth)
-  - [ ] PATCH /api/v1/tenants/{id} — Update tenant
-
-- [ ] **Patient endpoints**
-  - [ ] GET /api/v1/patients — List patients (tenant filtered)
-  - [ ] POST /api/v1/patients — Create patient
-  - [ ] GET /api/v1/patients/{id} — Get patient
-  - [ ] PATCH /api/v1/patients/{id} — Update patient
-  - [ ] DELETE /api/v1/patients/{id} — Soft delete
-
-- [ ] **Prescription endpoints**
-  - [ ] POST /api/v1/prescriptions — Create prescription
-  - [ ] GET /api/v1/prescriptions/{id} — Get with schedule
-  - [ ] PATCH /api/v1/prescriptions/{id} — Update
-  - [ ] GET /api/v1/prescriptions/{id}/schedule — Get computed schedule
-
-- [ ] **Box endpoints**
-  - [ ] GET /api/v1/boxes — List tenant boxes
-  - [ ] POST /api/v1/boxes/{id}/dispense — Trigger prise
-  - [ ] GET /api/v1/boxes/{id}/telemetry — Recent telemetry
-
-#### Service Tests
-
-- [ ] `core/services/security.py`
-  - [ ] validate_jwt (valid/invalid tokens)
-  - [ ] get_current_user (auth flow)
-  - [ ] get_current_tenant
-
-- [ ] `core/services/tenant.py`
-  - [ ] create_tenant
-  - [ ] add_user_to_tenant
-  - [ ] validate_tenant_access
-
-- [ ] `core/services/tenant_right.py`
-  - [ ] check_user_permission
-  - [ ] RBAC logic
-
-#### Repository Tests
-
-- [ ] Base repository patterns (CRUD, filters, pagination)
-- [ ] Tenant scoping (all queries filtered by tenant_id)
-- [ ] Soft deletes
-
-#### Middleware Tests
-
-- [ ] Auth middleware (JWT extraction, validation)
-- [ ] Tenant context injection
-- [ ] Request logging
-
-#### Integration Tests
-
-- [ ] Database transaction rollback on error
-- [ ] Multi-tenant isolation (user A can't read tenant B data)
-- [ ] Keycloak token validation (mock)
-
-**Tools**:
-- `pytest` + `pytest-asyncio` (async DB)
-- `httpx` (async HTTP client)
-- Mock/patch pour Keycloak, MQTT
-
-**Target**: 
-- API: 85%
-- Services: 90%
-- Repositories: 95%
-- Utils: 95%
+#### À ajouter
+- [ ] Tests endpoints WebSocket (§3 et §4)
+- [ ] Tests tâche `generate_distributions_for_prescriptions` (§2)
+- [ ] Tests job `preload_upcoming_distributions` (§1)
+- [ ] Tests services : `security.py`, `tenant.py`, `tenant_right.py`
+- [ ] Tests repositories : base CRUD, tenant scoping, soft deletes
+- [ ] Integration test : multi-tenant isolation end-to-end
+- [ ] Tests schedulerworker : idempotence, error/retry
 
 ---
 
-## 📚 Documentation code — **PRIORITÉ: MOYENNE**
+### API — Endpoints manquants
 
-**Convention**: Docstrings & commentaires EN FRANÇAIS (cf. `pyproject.toml` Ruff rules)
-
-### À compléter
-
-- [ ] **Docstrings modèles** (`core/db/models/*.py`)
-  - [ ] `Tenant` — Multi-tenant entity
-  - [ ] `Box` — Hardware entity
-  - [ ] `Prescription` — Prescription logic
-  - [ ] `Patient` — PII fields
-  - [ ] `Event` — Audit trail
-  - [ ] Etc.
-
-- [ ] **Docstrings services** (`core/services/*.py`)
-  - [ ] Chaque fonction publique
-  - [ ] Args, Returns, Raises
-  - [ ] Exemples usage
-
-- [ ] **Docstrings repositories** (`core/db/repositories/*.py`)
-  - [ ] Query methods
-  - [ ] Filters, pagination
-
-- [ ] **Comments complexes**
-  - [ ] Logique chiffrement/déchiffrement (`core/utils/crypto.py`)
-  - [ ] Calcul planning prescription (`core/services/prescription.py`)
-  - [ ] MQTT payload validation (`iotworker/tasks/*.py`)
-
-- [ ] **README technique** (pour devs)
-  - [ ] Comment ajouter endpoint API
-  - [ ] Comment ajouter modèle DB
-  - [ ] Comment traiter événement MQTT
-  - [ ] Comment ajouter job Scheduler
-
-**Format docstring**:
-```python
-def ma_fonction(arg1: str, arg2: int) -> dict:
-    """
-    Description courte en français (1-2 lignes).
-    
-    Description longue si nécessaire, expliquer pourquoi
-    cette fonction existe, quels side effects, etc.
-    
-    Args:
-        arg1: Description du premier argument
-        arg2: Description du second argument
-        
-    Returns:
-        Description de la valeur retournée
-        
-    Raises:
-        ValueError: Si condition X
-        CustomException: Si condition Y
-        
-    Note:
-        Informations additionnelles importantes
-        (ex: appelée par quoi, avec quelle fréquence)
-        
-    Example:
-        >>> result = ma_fonction("test", 42)
-        >>> print(result)
-        {'status': 'ok'}
-    """
-```
+- [ ] `POST /api/v1/prescriptions/generate-distributions` (voir §2)
+- [ ] `GET /api/v1/tasks/{task_id}/status` — polling état tâche Celery
+- [ ] `GET /api/v1/alerts` — alertes actives
+- [ ] `PATCH /api/v1/alerts/{id}` — acquittement alerte
+- [ ] `POST /api/v1/boxes/{id}/dispense` — déclenchement manuel prise
 
 ---
 
-## 🚀 Déploiement & DevOps — **PRIORITÉ: MOYENNE**
+## ⏳ Backlog — PRIORITÉ BASSE
 
-### Infrastructure
+### Déploiement & DevOps
 
-- [ ] **Docker**
-  - [ ] Dockerfile API
-  - [ ] Dockerfile IoT Worker
-  - [ ] Dockerfile Scheduler Worker
-  - [ ] docker-compose.yml (dev)
-  - [ ] docker-compose.prod.yml (prod)
+- [ ] Dockerfiles (API, IoT Worker, Scheduler Worker)
+- [ ] docker-compose.yml dev complet (Postgres, Redis, EMQX, Keycloak)
+- [ ] CI/CD GitHub Actions (lint, tests, build, push)
+- [ ] Pre-commit hooks (ruff format + check)
+- [ ] Kubernetes manifests (prod)
+- [ ] Monitoring : structured logging corrélé inter-services, Grafana/Prometheus
 
-- [ ] **Kubernetes** (optionnel, pour prod)
-  - [ ] k8s deployment API
-  - [ ] k8s deployment workers
-  - [ ] k8s services
-  - [ ] k8s configmaps (secrets)
-  - [ ] k8s PVC PostgreSQL
+### Sécurité
 
-- [ ] **Database**
-  - [ ] PostgreSQL setup (dev, staging, prod)
-  - [ ] Backup strategy
-  - [ ] Migration automation
-  - [ ] Performance tuning (indexes, etc.)
+- [ ] Audit OWASP Top 10
+- [ ] Stratégie rotation clé Fernet
+- [ ] Headers CORS stricts vérifiés
+- [ ] Retention logs configurée (ex. 90 jours)
+- [ ] MQTT : vérifier ACL topics par tenant/box
 
-- [ ] **MQTT Broker**
-  - [ ] Mosquitto setup + TLS
-  - [ ] mTLS certificates setup
-  - [ ] Topic ACL configuration
-  - [ ] Persistence config
+### Documentation code
 
-- [ ] **Redis**
-  - [ ] Redis setup (dev, staging, prod)
-  - [ ] Persistence (RDB/AOF)
-  - [ ] Replication? (pour prod)
-
-- [ ] **Keycloak**
-  - [ ] Realm setup
-  - [ ] Client creation
-  - [ ] User mapping
-  - [ ] OIDC flows
-
-### CI/CD
-
-- [ ] **GitHub Actions**
-  - [ ] Lint check (ruff)
-  - [ ] Run tests (pytest)
-  - [ ] Build Docker images
-  - [ ] Push to registry (DockerHub/ECR)
-  - [ ] Deploy staging
-  - [ ] Deploy prod (manual approval)
-
-- [ ] **Pre-commit hooks**
-  - [ ] ruff format
-  - [ ] ruff check
-  - [ ] pytest (local subset?)
-
-### Monitoring & Logging
-
-- [ ] **Structured logging** (structlog est déjà setup)
-  - [ ] API logs (requests, responses)
-  - [ ] Worker logs (job execution, errors)
-  - [ ] DB query logs (slow queries)
-  - [ ] MQTT message logs (high-level, pas PII)
-
-- [ ] **Metrics**
-  - [ ] API response times
-  - [ ] Worker job durations
-  - [ ] DB connection pool stats
-  - [ ] Box online/offline status
-  - [ ] Prise success/error rates
-
-- [ ] **Alerting**
-  - [ ] Worker downtime
-  - [ ] Database errors
-  - [ ] MQTT broker offline
-  - [ ] Box maintenance alerts
-  - [ ] High error rate
-
-- [ ] **Tracing** (optionnel)
-  - [ ] Jaeger / OpenTelemetry?
+- [ ] Docstrings modèles `core/db/models/*.py`
+- [ ] Docstrings services `core/services/*.py`
+- [ ] README dev : comment ajouter endpoint, modèle, job, handler MQTT
 
 ---
 
-## 🔐 Sécurité — **PRIORITÉ: MOYENNE**
-
-### Code
-
-- [ ] **Secret management**
-  - [ ] ❌ Jamais hardcoder secrets
-  - [ ] ✅ Utiliser variables d'environnement (cf `.env`)
-  - [ ] ❌ Jamais commiter `.env`
-  - [ ] Optionnel: Vault pour prod
-
-- [ ] **Input validation**
-  - [ ] Pydantic models pour tous les inputs
-  - [ ] Validation côté DB (constraints)
-  - [ ] MQTT payload validation
-
-- [ ] **SQL Injection**
-  - [ ] ✅ SQLAlchemy ORM résiste (pas de string concat)
-  - [ ] Vérifier: Pas de `execute(f"SELECT ...")`
-
-- [ ] **CSRF**
-  - [ ] API stateless (JWT) = pas de CSRF token nécessaire
-  - [ ] Vérifier: Headers CORS strictes
-
-### Infrastructure
-
-- [ ] **TLS/SSL**
-  - [ ] API: HTTPS partout (même dev?)
-  - [ ] MQTT: TLS 1.2+ + mTLS certs
-  - [ ] Certificats valides (pas auto-signed en prod)
-
-- [ ] **Authentication**
-  - [ ] ✅ Keycloak OIDC setup
-  - [ ] ✅ JWT validation
-  - [ ] Session timeouts
-
-- [ ] **Authorization (RBAC)**
-  - [ ] ✅ Tenant isolation
-  - [ ] ✅ Per-endpoint checks
-  - [ ] Audit qui a accès quoi
-
-- [ ] **Encryption**
-  - [ ] ✅ PII au repos (Fernet champs `c_*`)
-  - [ ] ✅ Clé d'encryption forte (Fernet)
-  - [ ] Rotation clé? (stratégie?)
-
-- [ ] **Audit**
-  - [ ] ✅ Event table complète
-  - [ ] ✅ Logs structurés
-  - [ ] Retention logs (ex: 90 jours?)
-
-**Audit de sécurité**: À planifier (OWASP Top 10 review)
-
----
-
-## 📦 API Endpoints — **PRIORITÉ: MOYENNE**
-
-Actuellement implémenté:
-- ✅ Health check
-- ✅ Keycloak OAuth2 flows (partial)
-- ✅ Tenant management (partial)
-- ✅ Patient CRUD (partial)
-- ✅ Invitation system (partial)
-
-À compléter:
-- [ ] **Prescriptions**
-  - [ ] POST /api/v1/prescriptions
-  - [ ] GET /api/v1/prescriptions/{id}
-  - [ ] PATCH /api/v1/prescriptions/{id}
-  - [ ] GET /api/v1/prescriptions/{id}/schedule
-
-- [ ] **Boxes**
-  - [ ] GET /api/v1/boxes
-  - [ ] POST /api/v1/boxes
-  - [ ] GET /api/v1/boxes/{id}
-  - [ ] POST /api/v1/boxes/{id}/dispense (Trigger prise)
-  - [ ] GET /api/v1/boxes/{id}/telemetry
-  - [ ] PATCH /api/v1/boxes/{id}/config
-
-- [ ] **Wheels & Slots**
-  - [ ] GET /api/v1/wheels
-  - [ ] POST /api/v1/wheels (assign to box)
-  - [ ] GET /api/v1/wheels/{id}/slots
-  - [ ] PATCH /api/v1/wheels/{id}/slots/{slot_id}
-
-- [ ] **Telemetry & Events**
-  - [ ] GET /api/v1/events (audit trail, filterable)
-  - [ ] GET /api/v1/boxes/{id}/telemetry (time series)
-
-- [ ] **Alerts & Supervision**
-  - [ ] GET /api/v1/alerts (active alerts)
-  - [ ] PATCH /api/v1/alerts/{id} (acknowledge)
-  - [ ] GET /api/v1/dashboard (KPIs, overview)
-
-Voir `docs/readme.md` pour specs détaillées.
-
----
-
-## 🐛 Known Issues & Bugs
+## 🐛 Known Issues
 
 ### Critical
-
-- [ ] **MQTT mTLS certs**: Pas de setup certificats en dev (blocker pour iotworker)
-- [ ] **Database schema**: Relation Prescription ↔ Box unclear (voir `docs/database.md`)
+- [ ] **MQTT mTLS certs** : setup certificats dev (blocker tests iotworker en isolation)
 
 ### High
-
-- [ ] **Keycloak setup**: Token claim tenant_id pas conforme?
-- [ ] **Scheduler persistence**: Pas clear comment persister job state si worker crash
+- [ ] **Keycloak** : claim `tenant_id` dans JWT à vérifier conforme
+- [ ] **Scheduler persistence** : état job si worker crash non géré
 
 ### Medium
-
-- [ ] **API error handling**: Format réponse inconsistent
-- [ ] **Logging**: Pas de correlation IDs entre services
-- [ ] **Performance**: N+1 queries possibles (ORM)
-
-### Low
-
-- [ ] **Type hints**: Quelques `Any` à remplacer
-- [ ] **Documentation**: README outdated en certains endroits
+- [ ] **API error handling** : format réponse erreur inconsistant
+- [ ] **Logging** : pas de correlation IDs entre services
+- [ ] **N+1 queries** : à vérifier sur list endpoints avec relations
 
 ---
 
 ## 🎯 Milestones
 
-### Milestone 1: MVP (Fin Décembre 2025)
+### Milestone 1 — MVP (Juillet 2026)
+- ✅ Architecture + Auth + CRUD entités
+- ✅ IoT Worker + Scheduler Worker de base
+- 🚧 WebSockets notifications (§3 minimal)
+- 🚧 Pre-load distributions (§1)
+- 🚧 Tests 50%+
+- ⏳ Docker Compose dev complet
 
-- ✅ Architecture documentée
-- 🚧 API endpoints de base (CRUD entités)
-- 🚧 IoT Worker fonctionnel
-- 🚧 Scheduler minimal
-- ⏳ Tests 50%+
-- ⏳ Docker Compose dev
-
-### Milestone 2: Beta (Janvier 2026)
-
-- [ ] API endpoints complets
-- [ ] IoT Worker production-ready
-- [ ] Scheduler complet (all jobs)
+### Milestone 2 — Beta (Septembre 2026)
+- [ ] WebSockets live updates complets (§4)
+- [ ] Tâche prescription→distributions (§2)
 - [ ] Tests 80%+
 - [ ] Kubernetes manifests
-- [ ] Monitoring & logging
+- [ ] Monitoring & alerting
 
-### Milestone 3: Release (Février 2026)
-
+### Milestone 3 — Release (Novembre 2026)
 - [ ] Security audit
 - [ ] Performance optimization
-- [ ] Documentation complète
-- [ ] CI/CD pipeline
+- [ ] CI/CD pipeline complet
 - [ ] Admin dashboard
-- [ ] Production deployment
+- [ ] Documentation complète
 
 ---
 
 ## 📞 Questions ouvertes
 
-1. **Keycloak tenant_id claim**: Comment injecter dans JWT? Custom mapper?
-2. **MQTT certificats dev**: Utiliser self-signed pour dev? Comment loader en Python?
-3. **Database schema Prescription**: Lier directement à Box ou via Order?
-4. **Scheduler persistence**: Event sourcing ou simple job queue suffisant?
-5. **Alertes**: Push notifications? Email? In-app only?
-6. **Admin dashboard**: Requis pour MVP ou backlog?
+1. **WebSocket vs SSE** : SSE suffit pour les live updates (unidirectionnel) ? ou besoin de bi-directionnel ?
+2. **Pre-load payload** : format exact du payload `preload` à aligner avec le firmware des medboxes
+3. **Celery task status** : polling REST ou WebSocket pour informer le front de l'avancement de `generate_distributions` ?
+4. **Reconnexion WS** : stocker les events dans Redis pour replay ? quelle durée de rétention ?
+5. **Keycloak tenant_id claim** : custom mapper confirmé ou alternative ?
+6. **Admin dashboard** : requis pour MVP ou backlog ?
 
 ---
 
-## 🔗 Références utiles
+## 🔗 Références
 
-- [`docs/architecture.md`](./docs/architecture.md) — Design système complet
-- [`docs/database.md`](./docs/database.md) — Schéma DB
-- [`docs/readme.md`](./docs/readme.md) — API endpoints (français)
-- [`readme.md`](./readme.md) — Quick start
-- [`pyproject.toml`](./pyproject.toml) — Dépendances & config
-
----
-
-## 📝 Notes
-
-- **Convention code**: Docstrings & comments français (voir Ruff config)
-- **Linting**: `poetry run ruff check medbox/`
-- **Format**: `poetry run ruff format medbox/`
-- **Tests**: `pytest tests/` ou `pytest tests/test_XXXX.py -v`
+- [`docs/architecture.md`](./docs/architecture.md)
+- [`docs/database.md`](./docs/database.md)
+- [`docs/readme.md`](./docs/readme.md)
+- [`readme.md`](./readme.md)
+- [`pyproject.toml`](./pyproject.toml)
 
 ---
 
-**Statut**: 🚧 En cours | **Dernière mise à jour**: Décembre 2025
+**Statut** : 🚧 En cours | **Dernière mise à jour** : Juin 2026

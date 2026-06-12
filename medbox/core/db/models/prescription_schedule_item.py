@@ -14,18 +14,19 @@ from medbox.core.db.models._mixins import IDMixin, TimestampMixin
 
 if TYPE_CHECKING:
     from medbox.core.db.models.box import Box
-    from medbox.core.db.models.prescription import Prescription
-    from medbox.core.db.models.prescription_item import PrescriptionItem
     from medbox.core.db.models.tenant import Tenant
+    from medbox.core.db.models.wheel_load_plan import WheelLoadPlan
+    from medbox.core.db.models.wheel_slot import WheelSlot
 
 
 class PrescriptionScheduleItem(Base, IDMixin, TimestampMixin):
-    """Une prise planifiée calculée par le scheduler.
+    """Une distribution planifiée correspondant à une case physique de la roue.
 
-    Chaque instance représente un moment précis où une box doit
-    distribuer un ou plusieurs médicaments pour un patient.
+    Chaque instance représente un moment précis où la medbox fait tourner
+    la roue pour libérer une case. Les médicaments dans cette case sont
+    définis via wheel_slot → WheelSlotPrescriptionItem.
 
-    Cycle de vie : pending → dispatched → taken | missed | error
+    Cycle de vie : pending → taken | error
     """
 
     __tablename__ = "prescription_schedule_items"
@@ -36,15 +37,18 @@ class PrescriptionScheduleItem(Base, IDMixin, TimestampMixin):
         index=True,
     )
 
-    prescription_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("prescriptions.id", ondelete="CASCADE"),
-        nullable=False,
+    wheel_load_plan_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("wheel_load_plans.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
+        doc="Plan de chargement qui a généré cet item",
     )
 
-    prescription_item_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("prescription_items.id", ondelete="SET NULL"),
+    wheel_slot_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("wheel_slots.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
+        doc="Case physique de la roue à distribuer",
     )
 
     box_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -65,19 +69,13 @@ class PrescriptionScheduleItem(Base, IDMixin, TimestampMixin):
         nullable=False,
         default="pending",
         index=True,
-        doc="pending | dispatched | taken | missed | error",
-    )
-
-    dispatched_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        doc="Horodatage de l'envoi de la commande à la box",
+        doc="pending | taken | error",
     )
 
     taken_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
-        doc="Horodatage de la prise confirmée par la box",
+        doc="Horodatage de la distribution confirmée par la medbox",
     )
 
     error_reason: Mapped[str | None] = mapped_column(
@@ -88,6 +86,8 @@ class PrescriptionScheduleItem(Base, IDMixin, TimestampMixin):
 
     # Relations
     tenant: Mapped[Tenant] = relationship()
-    prescription: Mapped[Prescription] = relationship()
-    prescription_item: Mapped[PrescriptionItem | None] = relationship()
+    wheel_load_plan: Mapped[WheelLoadPlan | None] = relationship(
+        back_populates="schedule_items",
+    )
+    wheel_slot: Mapped[WheelSlot | None] = relationship()
     box: Mapped[Box | None] = relationship()

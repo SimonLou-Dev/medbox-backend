@@ -37,16 +37,15 @@ celery_app.config_from_object(
         "worker_prefetch_multiplier": 1,
         # Tâches périodiques (Celery Beat — lancé dans le scheduler worker)
         "beat_schedule": {
-            # Dispatch des prises dues toutes les 5 minutes
-            "dispatch-scheduled-takes": {
-                "task": "medbox.schedulerworker.tasks.scheduling.dispatch_scheduled_takes",
-                "schedule": 300,
+            # Preload 3 prochaines distributions → chaque medbox, 2x/jour
+            "preload-morning": {
+                "task": "medbox.schedulerworker.tasks.preload.preload_upcoming_distributions",
+                "schedule": crontab(hour=8, minute=0),
                 "options": {"queue": "scheduler"},
             },
-            # Calcul des prochaines prises toutes les heures
-            "calculate-prescription-scheduling": {
-                "task": "medbox.schedulerworker.tasks.scheduling.calculate_prescription_scheduling",
-                "schedule": 3600,
+            "preload-evening": {
+                "task": "medbox.schedulerworker.tasks.preload.preload_upcoming_distributions",
+                "schedule": crontab(hour=20, minute=0),
                 "options": {"queue": "scheduler"},
             },
             # Surveillance des boxes toutes les 5 minutes
@@ -73,7 +72,7 @@ celery_app.config_from_object(
             "medbox.core.tasks.invitation_tasks",
             "medbox.core.tasks.medication_sync",
             "medbox.iotworker.tasks.dispense",
-            "medbox.schedulerworker.tasks.scheduling",
+            "medbox.schedulerworker.tasks.preload",
             "medbox.schedulerworker.tasks.monitoring",
             "medbox.schedulerworker.tasks.cleanup",
         ],

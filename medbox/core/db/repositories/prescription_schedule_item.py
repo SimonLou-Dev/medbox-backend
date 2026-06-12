@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from medbox.core.db.models.prescription_schedule_item import PrescriptionScheduleItem
 from medbox.core.db.repositories.base import BaseRepository
@@ -28,15 +28,28 @@ class PrescriptionScheduleItemRepository(BaseRepository[PrescriptionScheduleItem
             await session.refresh(item)
             return item
 
-    async def list_by_prescription(
+    async def create_many(
         self,
-        prescription_id: UUID,
+        items: list[PrescriptionScheduleItem],
+    ) -> list[PrescriptionScheduleItem]:
+        """Persiste plusieurs items en une seule transaction."""
+        async with async_session_local() as session:
+            session.add_all(items)
+            await session.commit()
+            for item in items:
+                await session.refresh(item)
+            return items
+
+    async def list_by_plan(
+        self,
+        plan_id: UUID,
     ) -> Sequence[PrescriptionScheduleItem]:
-        """Liste tous les items planifiés d'une prescription."""
+        """Liste tous les items d'un plan de chargement, triés par heure."""
         async with async_session_local() as session:
             stmt = (
                 select(self.model)
-                .where(self.model.prescription_id == prescription_id)
+                .where(self.model.wheel_load_plan_id == plan_id)
+                .options(selectinload(self.model.wheel_slot))
                 .order_by(self.model.scheduled_at)
             )
             if self.tenant_id:
@@ -44,24 +57,28 @@ class PrescriptionScheduleItemRepository(BaseRepository[PrescriptionScheduleItem
             result = await session.execute(stmt)
             return result.scalars().all()
 
-    async def list_due(
+    async def list_upcoming_by_box(
         self,
-        now: datetime | None = None,
+        box_id: UUID,
+        limit: int = 3,
     ) -> Sequence[PrescriptionScheduleItem]:
-        """Retourne les items en attente dont l'heure de prise est dépassée.
+        """Retourne les N prochaines distributions pending pour une box.
 
-        Utilisé par le scheduler pour déclencher les distributions.
+        Utilisé par le job preload pour alimenter la medbox 2x/jour.
         """
-        cutoff = now or datetime.now(tz=UTC)
+        from datetime import UTC, datetime
+
+        now = datetime.now(tz=UTC)
         async with async_session_local() as session:
             stmt = (
                 select(self.model)
+                .where(self.model.box_id == box_id)
                 .where(self.model.status == "pending")
-                .where(self.model.scheduled_at <= cutoff)
+                .where(self.model.scheduled_at >= now)
+                .options(selectinload(self.model.wheel_slot))
                 .order_by(self.model.scheduled_at)
+                .limit(limit)
             )
-            if self.tenant_id:
-                stmt = stmt.where(self.model.tenant_id == self.tenant_id)
             result = await session.execute(stmt)
             return result.scalars().all()
 
@@ -69,7 +86,7 @@ class PrescriptionScheduleItemRepository(BaseRepository[PrescriptionScheduleItem
         self,
         box_id: UUID,
     ) -> Sequence[PrescriptionScheduleItem]:
-        """Liste les items pending pour une box donnée."""
+        """Liste tous les items pending pour une box."""
         async with async_session_local() as session:
             stmt = (
                 select(self.model)
@@ -85,8 +102,7 @@ class PrescriptionScheduleItemRepository(BaseRepository[PrescriptionScheduleItem
         item_id: UUID,
         status: str,
         *,
-        dispatched_at: datetime | None = None,
-        taken_at: datetime | None = None,
+        taken_at=None,
         error_reason: str | None = None,
     ) -> PrescriptionScheduleItem | None:
         """Met à jour le statut d'un item."""
@@ -98,8 +114,6 @@ class PrescriptionScheduleItemRepository(BaseRepository[PrescriptionScheduleItem
                 return None
 
             item.status = status
-            if dispatched_at is not None:
-                item.dispatched_at = dispatched_at
             if taken_at is not None:
                 item.taken_at = taken_at
             if error_reason is not None:

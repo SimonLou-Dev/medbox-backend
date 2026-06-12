@@ -1,28 +1,23 @@
-"""Service de planification des prises de médicaments."""
+"""Service de gestion des statuts de distribution."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
 
-from medbox.core.db.models.prescription_schedule_item import PrescriptionScheduleItem
 from medbox.core.db.repositories.prescription_schedule_item import (
     PrescriptionScheduleItemRepository,
 )
-from medbox.core.dto.prescription_schedule_item import (
-    PrescriptionScheduleItemRequest,
-    PrescriptionScheduleItemResponse,
-)
+from medbox.core.dto.prescription_schedule_item import PrescriptionScheduleItemResponse
 
 
 class PrescriptionSchedulingService:
-    """Service pour créer et gérer les items de planning de prises.
+    """Service pour mettre à jour les statuts des distributions.
 
-    Utilisé par :
-    - Le scheduler worker pour calculer et déclencher les prises
-    - L'IoT worker pour marquer les prises comme taken/error
+    Les distributions sont créées exclusivement par WheelLoadPlanService.
+    Ce service gère uniquement les transitions de statut déclenchées
+    par la medbox via MQTT (taken, error).
     """
 
     def __init__(
@@ -33,82 +28,40 @@ class PrescriptionSchedulingService:
         self.tenant_id = tenant_id
         self.repo = repo or PrescriptionScheduleItemRepository(tenant_id=tenant_id)
 
-    async def schedule(
+    async def list_by_plan(
         self,
-        data: PrescriptionScheduleItemRequest,
-    ) -> PrescriptionScheduleItemResponse:
-        """Crée un item de planning pour une prise future."""
-        item = PrescriptionScheduleItem(
-            tenant_id=self.tenant_id,
-            prescription_id=data.prescription_id,
-            prescription_item_id=data.prescription_item_id,
-            box_id=data.box_id,
-            scheduled_at=data.scheduled_at,
-            status="pending",
-        )
-        created = await self.repo.create(item)
-        return PrescriptionScheduleItemResponse.from_model(created)
-
-    async def get_due_items(
-        self,
-        now: datetime | None = None,
+        plan_id: UUID,
     ) -> list[PrescriptionScheduleItemResponse]:
-        """Retourne les items dont l'heure de prise est dépassée (pending)."""
-        items = await self.repo.list_due(now=now)
+        """Liste toutes les distributions d'un plan de chargement."""
+        items = await self.repo.list_by_plan(plan_id)
         return [PrescriptionScheduleItemResponse.from_model(i) for i in items]
 
-    async def list_by_prescription(
+    async def list_upcoming_for_box(
         self,
-        prescription_id: UUID,
+        box_id: UUID,
+        limit: int = 3,
     ) -> list[PrescriptionScheduleItemResponse]:
-        """Liste tous les items planifiés d'une prescription."""
-        items = await self.repo.list_by_prescription(prescription_id)
+        """Retourne les N prochaines distributions d'une box."""
+        items = await self.repo.list_upcoming_by_box(box_id, limit=limit)
         return [PrescriptionScheduleItemResponse.from_model(i) for i in items]
-
-    async def mark_dispatched(
-        self,
-        item_id: UUID,
-    ) -> PrescriptionScheduleItemResponse:
-        """Marque un item comme dispatché (commande envoyée à la box)."""
-        item = await self.repo.update_status(
-            item_id,
-            "dispatched",
-            dispatched_at=datetime.now(tz=UTC),
-        )
-        if not item:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Item de planning {item_id} introuvable",
-            )
-        return PrescriptionScheduleItemResponse.from_model(item)
 
     async def mark_taken(
         self,
         item_id: UUID,
+        taken_at=None,
     ) -> PrescriptionScheduleItemResponse:
-        """Marque un item comme pris (confirmé par la box via MQTT)."""
+        """Marque une distribution comme effectuée (confirmée par la medbox)."""
+        from datetime import UTC, datetime
+
         item = await self.repo.update_status(
             item_id,
             "taken",
-            taken_at=datetime.now(tz=UTC),
+            taken_at=taken_at or datetime.now(tz=UTC),
         )
         if not item:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Item de planning {item_id} introuvable",
-            )
-        return PrescriptionScheduleItemResponse.from_model(item)
-
-    async def mark_missed(
-        self,
-        item_id: UUID,
-    ) -> PrescriptionScheduleItemResponse:
-        """Marque un item comme manqué (délai dépassé sans confirmation)."""
-        item = await self.repo.update_status(item_id, "missed")
-        if not item:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Item de planning {item_id} introuvable",
+                detail=f"Distribution {item_id} introuvable",
             )
         return PrescriptionScheduleItemResponse.from_model(item)
 
@@ -117,11 +70,11 @@ class PrescriptionSchedulingService:
         item_id: UUID,
         reason: str,
     ) -> PrescriptionScheduleItemResponse:
-        """Marque un item en erreur (ex: roue bloquée, timeout)."""
+        """Marque une distribution en erreur (ex: roue bloquée)."""
         item = await self.repo.update_status(item_id, "error", error_reason=reason)
         if not item:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Item de planning {item_id} introuvable",
+                detail=f"Distribution {item_id} introuvable",
             )
         return PrescriptionScheduleItemResponse.from_model(item)

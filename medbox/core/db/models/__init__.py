@@ -17,6 +17,8 @@ from medbox.core.db.models.telemetry import Telemetry
 from medbox.core.db.models.tenant import Tenant
 from medbox.core.db.models.user import User
 from medbox.core.db.models.wheel import Wheel
+from medbox.core.db.models.wheel_load_plan import WheelLoadPlan
+from medbox.core.db.models.wheel_load_plan_prescription import WheelLoadPlanPrescription
 from medbox.core.db.models.wheel_slot import WheelSlot
 from medbox.core.db.models.wheel_slot_prescription_item import WheelSlotPrescriptionItem
 
@@ -34,6 +36,8 @@ __all__ = [
     "Tenant",
     "User",
     "Wheel",
+    "WheelLoadPlan",
+    "WheelLoadPlanPrescription",
     "WheelSlot",
     "WheelSlotPrescriptionItem",
 ]

@@ -16,6 +16,7 @@ from medbox.api.routes.v1.prescription import router as prescription_router
 from medbox.api.routes.v1.tenant import router as tenant_router
 from medbox.api.routes.v1.wheel import router as wheel_router
 from medbox.api.routes.v1.wheel_admin import router as wheel_admin_router
+from medbox.api.routes.v1.wheel_load_plan import router as wheel_load_plan_router
 
 router_v1 = APIRouter(prefix="/v1")
 
@@ -33,4 +34,5 @@ router_v1.include_router(box_router)
 router_v1.include_router(box_admin_router)
 router_v1.include_router(wheel_router)
 router_v1.include_router(wheel_admin_router)
+router_v1.include_router(wheel_load_plan_router)
 router_v1.include_router(events_router)
