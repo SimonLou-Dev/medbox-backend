@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -18,7 +18,7 @@ class WsEvent(BaseModel):
 
     def model_post_init(self, __context: Any) -> None:
         if self.timestamp is None:
-            self.timestamp = datetime.utcnow()
+            self.timestamp = datetime.now(tz=UTC)
 
 
 # ---------------------------------------------------------------------------
