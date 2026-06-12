@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, ForeignKey, String
+from sqlalchemy import JSON, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from medbox.core.db.base import Base
@@ -51,6 +52,11 @@ class Event(Base, IDMixin, TimestampMixin):
         JSON,
         nullable=True,
         doc="Détails spécifiques (slot index, code erreur, etc.)",
+    )
+
+    acknowledged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
 
     tenant: Mapped[Tenant] = relationship(back_populates="events")

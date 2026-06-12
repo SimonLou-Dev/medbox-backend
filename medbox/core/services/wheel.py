@@ -40,6 +40,18 @@ class WheelService:
         wheels = await self.wheel_repo.list(with_slots=True)
         return [WheelResponse.from_model(w) for w in wheels]
 
+    async def list_paginated(
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        status: str | None = None,
+    ) -> tuple[int, list[WheelResponse]]:
+        """Liste paginée avec filtre optionnel de statut."""
+        total, wheels = await self.wheel_repo.list_paginated(
+            page=page, per_page=per_page, with_slots=True, status=status
+        )
+        return total, [WheelResponse.from_model(w) for w in wheels]
+
     async def get(self, wheel_id: UUID) -> WheelResponse:
         """Récupère une roue par ID (avec ses slots).
 

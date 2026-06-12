@@ -28,23 +28,25 @@ class WheelRepository(BaseRepository[Wheel]):
         page: int = 1,
         per_page: int = 20,
         with_slots: bool = False,
+        status: str | None = None,
     ) -> tuple[int, Sequence[Wheel]]:
-        """Liste les wheels du tenant avec pagination."""
+        """Liste les wheels du tenant avec pagination et filtre optionnel de statut."""
         if not self.tenant_id:
             msg = "tenant_id requis"
             raise ValueError(msg)
         offset = (page - 1) * per_page
         async with async_session_local() as session:
+            base_filter = Wheel.tenant_id == self.tenant_id
+            if status:
+                base_filter = base_filter & (Wheel.status == status)
             total = (
                 await session.execute(
-                    select(func.count())
-                    .select_from(Wheel)
-                    .where(Wheel.tenant_id == self.tenant_id)
+                    select(func.count()).select_from(Wheel).where(base_filter)
                 )
             ).scalar_one()
             stmt = (
                 select(Wheel)
-                .where(Wheel.tenant_id == self.tenant_id)
+                .where(base_filter)
                 .order_by(Wheel.created_at.desc())
                 .offset(offset)
                 .limit(per_page)

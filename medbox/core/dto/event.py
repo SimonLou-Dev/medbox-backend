@@ -15,10 +15,12 @@ class EventResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    id: UUID
     box_id: UUID | None
     type: str
     payload: dict | None
     created_at: datetime
+    acknowledged_at: datetime | None = None
 
     @classmethod
     def from_model(cls, e: Event) -> EventResponse:

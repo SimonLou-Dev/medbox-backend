@@ -63,11 +63,12 @@ async def list_wheels(
     wheel_svc: WheelSvcDep,
     page: Annotated[int, Query(ge=1)] = 1,
     per_page: Annotated[int, Query(ge=1, le=100)] = 20,
+    status: Annotated[str | None, Query(description="Filtrer par statut")] = None,
 ) -> WheelPageResponse:
-    """Liste les wheels du tenant avec pagination."""
-    total, wheels = await wheel_svc.list_paginated(page=page, per_page=per_page)
+    """Liste les wheels du tenant avec pagination et filtre optionnel de statut."""
+    total, wheels = await wheel_svc.list_paginated(page=page, per_page=per_page, status=status)
     return WheelPageResponse(
-        items=[WheelResponse.from_model(w) for w in wheels],
+        items=wheels,
         total=total,
         page=page,
         per_page=per_page,
