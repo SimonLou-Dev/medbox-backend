@@ -13,6 +13,7 @@
 | [`architecture.md`](./architecture.md) | Design système + MQTT + multi-tenant |
 | [`database.md`](./database.md) | Schéma DB + ERD |
 | [`mqtt_protocol.md`](./mqtt_protocol.md) | Spécification MQTT |
+| [`websocket.md`](./websocket.md) | WebSocket — notifications temps réel |
 | [`readme.md`](./readme.md) | Endpoints API |
 
 ---
