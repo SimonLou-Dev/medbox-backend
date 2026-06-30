@@ -14,7 +14,10 @@ from medbox.core.db.models.prescription import Prescription
 from medbox.core.db.models.prescription_item import PrescriptionItem
 from medbox.core.db.models.tenant import Tenant
 from medbox.core.db.models.wheel import Wheel
-from medbox.core.dto.wheel_load_plan import WheelLoadPlanConfirmRequest, WheelLoadPlanCreateRequest
+from medbox.core.dto.wheel_load_plan import (
+    WheelLoadPlanConfirmRequest,
+    WheelLoadPlanCreateRequest,
+)
 from medbox.core.services.wheel_load_plan import (
     WheelLoadPlanService,
     _resolve_distribution_times,
@@ -130,8 +133,6 @@ class TestResolveDistributionTimes:
         assert times == [time(8, 0)]
 
     def test_unknown_moment_falls_back_to_frequency(self):
-        from datetime import time
-
         times = _resolve_distribution_times({"moments": ["inconnu"], "times_per_day": 2})
         assert len(times) == 2
 
