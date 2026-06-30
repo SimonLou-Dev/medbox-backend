@@ -94,9 +94,7 @@ class TestListUpcomingByBox:
 
         box = await _make_box(db_session, tenant.id)
         for i in range(5):
-            await _make_psi(
-                db_session, tenant.id, box.id, _FUTURE + timedelta(hours=i)
-            )
+            await _make_psi(db_session, tenant.id, box.id, _FUTURE + timedelta(hours=i))
         await db_session.commit()
 
         repo = PrescriptionScheduleItemRepository()
@@ -256,9 +254,7 @@ class TestPreloadTask:
 
         box = await _make_box(db_session, tenant.id, status="active")
         for i in range(5):
-            await _make_psi(
-                db_session, tenant.id, box.id, _FUTURE + timedelta(hours=i)
-            )
+            await _make_psi(db_session, tenant.id, box.id, _FUTURE + timedelta(hours=i))
         await db_session.commit()
 
         mqtt_mock = _make_mqtt_mock()

@@ -133,7 +133,9 @@ class TestResolveDistributionTimes:
         assert times == [time(8, 0)]
 
     def test_unknown_moment_falls_back_to_frequency(self):
-        times = _resolve_distribution_times({"moments": ["inconnu"], "times_per_day": 2})
+        times = _resolve_distribution_times(
+            {"moments": ["inconnu"], "times_per_day": 2}
+        )
         assert len(times) == 2
 
 
@@ -162,9 +164,13 @@ class TestWheelLoadPlanCreate:
         assert result.filling_list[0].case_number == 1
         assert result.filling_list[0].slot_index == 0
         assert len(result.filling_list[0].medications) == 1
-        assert result.filling_list[0].medications[0].medication_label == "DOLIPRANE 500mg"
+        assert (
+            result.filling_list[0].medications[0].medication_label == "DOLIPRANE 500mg"
+        )
 
-    async def test_two_items_twice_per_day_covers_10_days(self, db_session: AsyncSession):
+    async def test_two_items_twice_per_day_covers_10_days(
+        self, db_session: AsyncSession
+    ):
         """2 prises/jour → 21//2 = 10 jours couverts, 20 slots utilisés."""
         tenant, patient, box, wheel, _, _ = await _setup_base(db_session)
 

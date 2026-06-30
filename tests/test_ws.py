@@ -42,12 +42,16 @@ def _make_ws_app():
 
 
 def _valid_auth():
-    return patch.object(SecurityService, "decode_token", new=AsyncMock(return_value=_VALID_CLAIMS))
+    return patch.object(
+        SecurityService, "decode_token", new=AsyncMock(return_value=_VALID_CLAIMS)
+    )
 
 
 def _invalid_auth():
     return patch.object(
-        SecurityService, "decode_token", new=AsyncMock(side_effect=Exception("bad token"))
+        SecurityService,
+        "decode_token",
+        new=AsyncMock(side_effect=Exception("bad token")),
     )
 
 
@@ -245,7 +249,9 @@ class TestWsEndpointAuth:
         no_tenant = {"sub": str(uuid4())}
         url = "/api/v1/ws/notifications?token=tok"
         with (
-            patch.object(SecurityService, "decode_token", new=AsyncMock(return_value=no_tenant)),
+            patch.object(
+                SecurityService, "decode_token", new=AsyncMock(return_value=no_tenant)
+            ),
             pytest.raises(WebSocketDisconnect) as exc_info,
             client.websocket_connect(url) as ws,
         ):
@@ -257,7 +263,9 @@ class TestWsEndpointAuth:
         no_sub = {"tenant_id": str(uuid4())}
         url = "/api/v1/ws/notifications?token=tok"
         with (
-            patch.object(SecurityService, "decode_token", new=AsyncMock(return_value=no_sub)),
+            patch.object(
+                SecurityService, "decode_token", new=AsyncMock(return_value=no_sub)
+            ),
             pytest.raises(WebSocketDisconnect) as exc_info,
             client.websocket_connect(url) as ws,
         ):
@@ -266,7 +274,11 @@ class TestWsEndpointAuth:
 
     def test_valid_token_ping_pong(self):
         client = TestClient(_make_ws_app(), raise_server_exceptions=False)
-        with _valid_auth(), _noop_redis(), client.websocket_connect("/api/v1/ws/notifications?token=valid") as ws:
+        with (
+            _valid_auth(),
+            _noop_redis(),
+            client.websocket_connect("/api/v1/ws/notifications?token=valid") as ws,
+        ):
             ws.send_text('{"type":"ping"}')
             response = ws.receive_text()
         assert json.loads(response)["type"] == "pong"
@@ -283,8 +295,11 @@ class TestWsEndpointAuth:
 
     def test_live_endpoint_valid_token_ping_pong(self):
         client = TestClient(_make_ws_app(), raise_server_exceptions=False)
-        with _valid_auth(), _noop_redis(), client.websocket_connect("/api/v1/ws/live?token=valid") as ws:
+        with (
+            _valid_auth(),
+            _noop_redis(),
+            client.websocket_connect("/api/v1/ws/live?token=valid") as ws,
+        ):
             ws.send_text('{"type":"ping"}')
             response = ws.receive_text()
         assert json.loads(response)["type"] == "pong"
-

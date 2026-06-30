@@ -66,7 +66,9 @@ async def list_wheels(
     status: Annotated[str | None, Query(description="Filtrer par statut")] = None,
 ) -> WheelPageResponse:
     """Liste les wheels du tenant avec pagination et filtre optionnel de statut."""
-    total, wheels = await wheel_svc.list_paginated(page=page, per_page=per_page, status=status)
+    total, wheels = await wheel_svc.list_paginated(
+        page=page, per_page=per_page, status=status
+    )
     return WheelPageResponse(
         items=wheels,
         total=total,
