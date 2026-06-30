@@ -14,8 +14,8 @@
 | ✅ | IoT Worker (MQTT handlers + telemetry) | 80% |
 | ✅ | Scheduler Worker (preload 2x/jour) | 90% |
 | ✅ | WheelLoadPlan — moulinette + distributions | 100% |
-| 🚧 | WebSockets (notifications + live updates) | 0% |
-| 🚧 | Tests & Coverage | 25% |
+| ✅ | WebSockets (notifications + live updates) | 95% |
+| 🚧 | Tests & Coverage | 55% |
 | ⏳ | Déploiement & DevOps | 0% |
 | ⏳ | Admin Dashboard | 0% |
 
@@ -70,62 +70,25 @@
 
 ## 🚧 À implémenter — PRIORITÉ HAUTE
 
-### 1. WebSocket — Notifications UX utilisateur
+### 1. WebSocket — Notifications UX utilisateur ✅
 
 **Responsabilité**: Confirmer les actions du soignant en temps réel (feedback type toast/snackbar) et signaler les alertes importantes.
 
-#### Exemples de notifications attendues
-- "Plan de chargement créé" / "Roue assignée à la medbox"
-- "Sauvegardé" (mise à jour prescription, config box…)
-- "Erreur : roue non disponible"
-- "Alerte : batterie critique sur Box #42"
-- "Alerte : Box #12 en maintenance (roue bloquée)"
-
-#### Sous-tâches
-
-- [ ] **Setup WebSocket** (FastAPI natif)
-  - [ ] Endpoint : `ws://api/v1/ws/notifications?token=<jwt>`
-  - [ ] Auth JWT sur handshake (rejeter si token invalide)
-  - [ ] Tenant isolation : un utilisateur ne reçoit que les events de son tenant
-
-- [ ] **Connection Manager** (`medbox/api/ws/manager.py`)
-  - [ ] Registre connexions : `{ tenant_id → { user_id → [ws_connections] } }`
-  - [ ] `notify_user(user_id, event)` — notif ciblée
-  - [ ] `broadcast_tenant(tenant_id, event)` — tous les soignants du tenant
-  - [ ] Gestion déconnexion propre + heartbeat ping/pong
-
-- [ ] **Types de notifications**
-  - [ ] `ACTION_SUCCESS` — confirmation action soignant
-  - [ ] `ACTION_ERROR` — échec avec message lisible
-  - [ ] `BOX_ALERT` — alerte box (offline, batterie critique, maintenance)
-  - [ ] `TAKE_EVENT` — distribution confirmée ou en erreur (informatif)
-
-- [ ] **Intégration workers**
-  - [ ] `handle_error_event` + `telemetry.py` → Redis pub/sub → WS broadcast
-  - [ ] `WheelLoadPlanService.confirm()` → notif "Roue assignée"
-
-- [ ] **Tests**
-  - [ ] Test connexion / auth invalide → rejet
-  - [ ] Test isolation tenant
-  - [ ] Test broadcast après action
-
-**Fichiers** : `medbox/api/ws/manager.py` (à créer), `medbox/api/routes/v1/ws.py` (à créer)
+- ✅ **Setup WebSocket** — `ws://api/v1/ws/notifications?token=<jwt>`
+- ✅ **Auth JWT sur handshake** — rejet code 4001 si token invalide / tenant manquant
+- ✅ **Connection Manager** (`medbox/api/ws/manager.py`) — registre, notify_user, broadcast_tenant, heartbeat ping/pong
+- ✅ **Types de notifications** — ACTION_SUCCESS, ACTION_ERROR, BOX_ALERT, TAKE_EVENT, BOX_STATUS, DISTRIBUTION_UPDATE
+- ✅ **Intégration workers** — handle_error_event, handle_take_event, telemetry.py, WheelLoadPlanService.confirm() → Redis pub/sub → WS
+- ✅ **Tests** (`tests/test_ws.py` — 24 tests) — auth, isolation tenant, ping/pong, events
 
 ---
 
-### 2. WebSocket — Live updates dashboard
+### 2. WebSocket — Live updates dashboard ✅
 
-**Responsabilité**: Mise à jour de certaines vues sans re-fetch REST complet.
+- ✅ `ws://api/v1/ws/live?token=<jwt>&box_id=<uuid>` — BOX_STATUS, DISTRIBUTION_UPDATE
+- ✅ Infrastructure partagée avec §1 (même Connection Manager)
 
-> ⚠️ À décider avec le front : si polling REST toutes les 30s suffit, déprioriser.
-
-- [ ] État live d'une box : `{status, battery_level, last_seen}` — page détail box
-- [ ] Changement statut distribution : `{item_id, status, taken_at}` — page planning
-- [ ] Canaux : `ws://api/v1/ws/boxes/{box_id}/live` + `ws://api/v1/ws/distributions/live`
-- [ ] Partage infrastructure WS avec §1 (même Connection Manager)
-- [ ] SSE en alternative si unidirectionnel suffit
-
-**Fichiers** : partagé avec §1 — `medbox/api/ws/`
+> ⚠️ À décider avec le front : si polling REST 30s suffit, les events BOX_STATUS/DISTRIBUTION_UPDATE peuvent rester non-câblés côté front.
 
 ---
 
@@ -133,7 +96,7 @@
 
 ### Tests & Coverage — Objectif 80%+
 
-**Coverage actuelle** : ~25%
+**Coverage actuelle** : ~55% (176 tests)
 
 #### Tests existants ✅
 ```
@@ -148,25 +111,25 @@ tests/
 ├── test_prescription.py
 ├── test_admin.py
 ├── test_invitation.py
-└── ... (14 fichiers total, 119 tests)
+├── test_tenant.py
+├── test_api_multi_tenant.py
+├── test_wheel_load_plan.py   — moulinette + confirm + list
+├── test_preload.py           — job preload + list_upcoming_by_box
+└── test_ws.py                — ConnectionManager + events + auth endpoint
 ```
 
 #### À ajouter
-- [ ] `test_wheel_load_plan.py` — moulinette (cas nominal, cas saturé >21 cases, prescriptions incompatibles)
-- [ ] `test_wheel_load_plan.py` — confirm (PSI créés, roue montée, statut plan)
-- [ ] `test_preload.py` — job preload (3 items par box, skip box sans items, mock MQTT)
-- [ ] Tests WebSocket (§1 et §2 ci-dessus)
-- [ ] Tests services : `security.py`, `tenant.py`, `tenant_right.py`
+- [ ] Tests services : `security.py`, `tenant_right.py`
 - [ ] Tests repositories : CRUD, tenant scoping, soft deletes
-- [ ] Integration test : multi-tenant isolation end-to-end
+- [ ] Tests IoT worker : handle_take_event, handle_error_event (avec mocks Redis/DB)
 
 ---
 
-### API — Endpoints manquants
+### API — Endpoints ✅
 
-- [ ] `GET /api/v1/wheels?status=in_stock` — roues disponibles en stock (utilisé avant création WheelLoadPlan)
-- [ ] `GET /api/v1/alerts` — alertes actives
-- [ ] `PATCH /api/v1/alerts/{id}` — acquittement alerte
+- ✅ `GET /api/v1/wheels?status=in_stock` — roues disponibles
+- ✅ `GET /api/v1/alerts` — alertes actives
+- ✅ `PATCH /api/v1/alerts/{id}` — acquittement alerte
 
 ---
 

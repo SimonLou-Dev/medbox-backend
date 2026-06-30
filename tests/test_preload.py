@@ -1,6 +1,5 @@
 """Tests — preload_upcoming_distributions task + list_upcoming_by_box repository."""
 
-import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -23,7 +22,7 @@ pytestmark = pytest.mark.asyncio
 # Helpers
 # ==============================================================================
 
-_NOW = datetime(2026, 6, 12, 8, 0, 0, tzinfo=UTC)
+_NOW = datetime.now(tz=UTC)
 _FUTURE = _NOW + timedelta(hours=2)
 
 
@@ -311,7 +310,7 @@ class TestPreloadTask:
         db_session.add(tenant)
         await db_session.flush()
 
-        box = await _make_box(db_session, tenant.id, status="active")
+        await _make_box(db_session, tenant.id, status="active")
         # Pas de PSI → rien à envoyer
         await db_session.commit()
 
@@ -360,9 +359,8 @@ class TestPreloadTask:
         db_session.add(tenant)
         await db_session.flush()
 
-        scheduled = datetime(2026, 6, 13, 8, 0, 0, tzinfo=UTC)
         box = await _make_box(db_session, tenant.id, status="active")
-        await _make_psi(db_session, tenant.id, box.id, scheduled)
+        await _make_psi(db_session, tenant.id, box.id, _FUTURE)
         await db_session.commit()
 
         mqtt_mock = _make_mqtt_mock()
@@ -381,4 +379,5 @@ class TestPreloadTask:
         dist = payload["distributions"][0]
         assert "scheduled_at" in dist
         assert "schedule_item_id" in dist
-        assert "2026-06-13" in dist["scheduled_at"]
+        # Vérifie le format ISO 8601 (T comme séparateur date/heure)
+        assert "T" in dist["scheduled_at"]

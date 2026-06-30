@@ -163,6 +163,18 @@ def handle_telemetry(self, box_uid: str, payload: dict) -> dict:
             now,
         )
 
+        # Notifier le front — box vue en ligne
+        try:
+            from medbox.api.ws.events import box_status_update
+            from medbox.api.ws.manager import publish_to_tenant
+
+            await publish_to_tenant(
+                str(box.tenant_id),
+                box_status_update(str(box.id), box.status, None),
+            )
+        except Exception as ws_exc:
+            logger.debug("WS publish failed (non-blocking) : %s", ws_exc)
+
         logger.info(
             "Télémétrie reçue box=%s drift=%.0fs correction=%s",
             box_uid,
