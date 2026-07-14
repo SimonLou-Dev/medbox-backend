@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from medbox.core.db.models.wheel import Wheel
 from medbox.core.db.models.wheel_slot import WheelSlot
@@ -49,7 +49,7 @@ class WheelResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID = Field(exclude=True)  # interne uniquement, non exposé en JSON
+    id: UUID  # UUID interne, expose pour les actions (mount, load-plan, etc.)
     wheel_uid: str
     tenant_id: UUID | None
     patient_id: UUID | None

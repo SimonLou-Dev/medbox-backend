@@ -56,7 +56,7 @@ class BoxResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID = Field(exclude=True)  # interne uniquement, non exposé en JSON
+    id: UUID  # UUID interne, expose pour les actions (mount, load-plan, etc.)
     box_uid: str
     tenant_id: UUID | None
     name: str | None
