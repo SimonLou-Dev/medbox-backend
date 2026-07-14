@@ -72,6 +72,7 @@ celery_app.config_from_object(
             "medbox.core.tasks.invitation_tasks",
             "medbox.core.tasks.medication_sync",
             "medbox.iotworker.tasks.dispense",
+            "medbox.iotworker.tasks.commands",
             "medbox.schedulerworker.tasks.preload",
             "medbox.schedulerworker.tasks.monitoring",
             "medbox.schedulerworker.tasks.cleanup",

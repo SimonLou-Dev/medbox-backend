@@ -3,9 +3,10 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
+from medbox.core.celery_app import celery_app
 from medbox.core.dto.box import (
     BoxRequest,
     BoxResponse,
@@ -121,6 +122,26 @@ async def adopt_box(
     """Appaire une box au tenant via scan QR code."""
     db_user = await user_svc.get_user_from_subject(user.subject)
     return await BoxAdminService().adopt(box_uid=box_uid, tenant_id=db_user.tenant_id)
+
+
+@router.post("/{box_uid}/test-distribution", status_code=status.HTTP_202_ACCEPTED)
+async def test_distribution(
+    box_uid: str,
+    user: CurrentUser,
+    box_svc: BoxSvcDep,
+) -> dict:
+    """Envoie une commande de test de distribution (7 jours) à la box via MQTT."""
+    box = await box_svc.box_repo.get_by_uid(box_uid)
+    if not box or box.tenant_id != box_svc.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Box '{box_uid}' introuvable",
+        )
+    celery_app.send_task(
+        "medbox.iotworker.tasks.commands.send_test_distribution",
+        args=[box.box_uid, 7],
+    )
+    return {"status": "queued", "box_uid": box.box_uid, "days": 7}
 
 
 @router.delete("/{box_id}/unadopt", status_code=status.HTTP_200_OK)
