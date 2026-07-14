@@ -88,7 +88,8 @@ class WheelAdminService:
         wheel.box_id = None
         wheel.status = "in_stock"
         updated = await self._repo.update(wheel)
-        return WheelResponse.from_model(updated)
+        loaded = await self._repo.get_global(updated.id, with_slots=True)
+        return WheelResponse.from_model(loaded)
 
     async def delete(self, wheel_id: UUID) -> None:
         """Supprime définitivement une wheel et ses slots."""
@@ -119,7 +120,8 @@ class WheelAdminService:
         wheel.tenant_id = tenant_id
         wheel.status = "prepared"
         updated = await self._repo.update(wheel)
-        return WheelResponse.from_model(updated)
+        loaded = await self._repo.get_global(updated.id, with_slots=True)
+        return WheelResponse.from_model(loaded)
 
     async def unadopt(self, wheel_id: UUID, tenant_id: UUID) -> WheelResponse:
         """Détache une wheel de son tenant."""
@@ -133,7 +135,8 @@ class WheelAdminService:
         wheel.box_id = None
         wheel.status = "in_stock"
         updated = await self._repo.update(wheel)
-        return WheelResponse.from_model(updated)
+        loaded = await self._repo.get_global(updated.id, with_slots=True)
+        return WheelResponse.from_model(loaded)
 
     async def mount(
         self, wheel_id: UUID, box_id: UUID, tenant_id: UUID
@@ -156,7 +159,8 @@ class WheelAdminService:
         wheel.box_id = box_id
         wheel.status = "mounted"
         updated = await self._repo.update(wheel)
-        return WheelResponse.from_model(updated)
+        loaded = await self._repo.get_global(updated.id, with_slots=True)
+        return WheelResponse.from_model(loaded)
 
     async def unmount(self, wheel_id: UUID, tenant_id: UUID) -> WheelResponse:
         """Démonte une wheel de sa box."""
@@ -169,4 +173,5 @@ class WheelAdminService:
         wheel.box_id = None
         wheel.status = "prepared"
         updated = await self._repo.update(wheel)
-        return WheelResponse.from_model(updated)
+        loaded = await self._repo.get_global(updated.id, with_slots=True)
+        return WheelResponse.from_model(loaded)
