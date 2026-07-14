@@ -15,14 +15,36 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["WebSocket"])
 
 
-async def _authenticate_ws(websocket: WebSocket, token: str) -> tuple[str, str] | None:
-    """Valide le JWT et retourne (tenant_id, user_id) ou ferme la connexion."""
-    svc = SecurityService()
+async def _authenticate_ws(
+    websocket: WebSocket, token: str | None
+) -> tuple[str, str] | None:
+    """Valide le JWT et retourne (tenant_id, user_id) ou ferme la connexion.
+
+    Le token est cherche d'abord en query (?token=), puis dans le cookie HttpOnly
+    `access_token` (le meme que l'auth HTTP) — ce qui permet a un front authentifie
+    par cookie de se connecter au WS sans exposer le JWT en JavaScript.
+
+    Le tenant est resolu depuis la DB via le subject du JWT (source de verite,
+    coherent avec les canaux de publication ws:tenant:{tenant_id}).
+    """
+    if not token:
+        token = websocket.cookies.get("access_token")
+    if not token:
+        await websocket.close(code=4001, reason="missing_token")
+        return None
+
     try:
-        claims = await svc.decode_token(token)
-        tenant_id = claims.get("tenant_id") or claims.get("tenantId")
+        claims = await SecurityService().decode_token(token)
         user_id = claims.get("sub")
-        if not tenant_id or not user_id:
+        if not user_id:
+            await websocket.close(code=4001, reason="missing_tenant_or_user")
+            return None
+
+        from medbox.core.services.user import UserService
+
+        db_user = await UserService().get_user_from_subject(str(user_id))
+        tenant_id = db_user.tenant_id if db_user else None
+        if not tenant_id:
             await websocket.close(code=4001, reason="missing_tenant_or_user")
             return None
         return str(tenant_id), str(user_id)
@@ -34,7 +56,7 @@ async def _authenticate_ws(websocket: WebSocket, token: str) -> tuple[str, str] 
 @router.websocket("/ws/notifications")
 async def ws_notifications(
     websocket: WebSocket,
-    token: str = Query(..., description="JWT access token"),
+    token: str | None = Query(default=None, description="JWT (optionnel si cookie access_token)"),
 ) -> None:
     """Canal de notifications UX en temps réel.
 
@@ -89,7 +111,7 @@ async def ws_notifications(
 @router.websocket("/ws/live")
 async def ws_live(
     websocket: WebSocket,
-    token: str = Query(..., description="JWT access token"),
+    token: str | None = Query(default=None, description="JWT (optionnel si cookie access_token)"),
     box_id: str | None = Query(default=None, description="Filtrer par box_id"),
 ) -> None:
     """Canal live updates dashboard (état boxes, distributions).
