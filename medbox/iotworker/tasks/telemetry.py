@@ -148,6 +148,14 @@ def handle_telemetry(self, box_uid: str, payload: dict) -> dict:
                     payload["last_sync"],
                 )
 
+        # Infos reseau remontees par le firmware (cle courte ou longue)
+        mac = payload.get("mac") or payload.get("mac_address")
+        if mac:
+            box_updates["mac_address"] = str(mac)
+        ip = payload.get("ip") or payload.get("ip_address")
+        if ip:
+            box_updates["ip_address"] = str(ip)
+
         async with async_session_local() as session:
             result = await session.execute(select(Box).where(Box.box_uid == box_uid))
             box = result.scalar_one_or_none()

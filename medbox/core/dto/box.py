@@ -73,6 +73,8 @@ class BoxResponse(BaseModel):
     timezone: str | None
     last_seen_at: datetime | None
     last_sync_at: datetime | None
+    mac_address: str | None = None
+    ip_address: str | None = None
     created_at: datetime
     updated_at: datetime
 

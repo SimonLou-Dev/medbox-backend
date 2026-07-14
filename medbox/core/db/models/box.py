@@ -52,6 +52,10 @@ class Box(Base, IDMixin, TimestampMixin):
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Infos reseau remontees par la telemetrie du firmware
+    mac_address: Mapped[str | None] = mapped_column(String(17))
+    ip_address: Mapped[str | None] = mapped_column(String(45))
+
     tenant: Mapped[Tenant] = relationship(back_populates="boxes")
     patient: Mapped[Patient | None] = relationship(back_populates="boxes")
     wheels: Mapped[list[Wheel]] = relationship(back_populates="box")
