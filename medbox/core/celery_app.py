@@ -48,10 +48,10 @@ celery_app.config_from_object(
                 "schedule": crontab(hour=20, minute=0),
                 "options": {"queue": "scheduler"},
             },
-            # Surveillance des boxes toutes les 5 minutes
+            # Surveillance des boxes toutes les 30 secondes
             "monitor-boxes": {
                 "task": "medbox.schedulerworker.tasks.monitoring.monitor_boxes",
-                "schedule": 300,
+                "schedule": 30,
                 "options": {"queue": "scheduler"},
             },
             # Nettoyage quotidien à 02:00 UTC
