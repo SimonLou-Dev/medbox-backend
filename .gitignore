@@ -93,3 +93,6 @@ secret/
 config/secrets/
 
 # =============
+
+# Notes/credentials perso (ne pas commiter)
+list.txt
