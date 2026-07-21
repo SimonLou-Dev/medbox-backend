@@ -18,6 +18,24 @@ logger = logging.getLogger(__name__)
 RTC_DRIFT_THRESHOLD_SECONDS = 600  # 10 minutes
 
 
+def _is_offline(last_seen: datetime | None, now: datetime) -> bool:
+    """Vrai si la box etait consideree hors ligne au dernier contact connu.
+
+    Meme seuil que la tache de monitoring, pour que les deux notifications
+    (passage hors ligne / retour en ligne) restent coherentes.
+    """
+    from datetime import UTC, timedelta
+
+    from medbox.core.config.settings import settings
+
+    if last_seen is None:
+        return True
+    if last_seen.tzinfo is None:
+        last_seen = last_seen.replace(tzinfo=UTC)
+    cutoff = now - timedelta(minutes=settings.box_offline_threshold_minutes)
+    return last_seen < cutoff
+
+
 async def _send_rtc_sync(box_uid: str, server_time_iso: str) -> None:
     """Publie une commande sync_time vers la box via MQTT."""
     import json
@@ -133,6 +151,12 @@ def handle_telemetry(self, box_uid: str, payload: dict) -> dict:
             logger.warning("handle_telemetry: box UID %s introuvable", box_uid)
             return {"status": "skipped", "reason": "box_not_found"}
 
+        # Transition hors ligne -> en ligne : on compare le dernier contact connu
+        # AVANT de l'ecraser. Permet de notifier le front une seule fois au retour,
+        # au lieu de spammer a chaque telemetrie (toutes les 20 s).
+        was_offline = _is_offline(box.last_seen_at, now)
+        box_name = box.name or box.box_uid
+
         box_updates: dict = {"last_seen_at": now}
         if "firmware_version" in payload:
             box_updates["firmware_version"] = str(payload["firmware_version"])
@@ -173,13 +197,20 @@ def handle_telemetry(self, box_uid: str, payload: dict) -> dict:
 
         # Notifier le front — box vue en ligne
         try:
-            from medbox.api.ws.events import box_status_update
+            from medbox.api.ws.events import box_alert, box_status_update
             from medbox.api.ws.manager import publish_to_tenant
 
             await publish_to_tenant(
                 str(box.tenant_id),
                 box_status_update(str(box.id), box.status, None),
             )
+            # Retour en ligne : alerte dediee pour declencher un toast cote front.
+            if was_offline:
+                logger.info("Box %s de nouveau en ligne", box_uid)
+                await publish_to_tenant(
+                    str(box.tenant_id),
+                    box_alert(box.id, "online", f"MedBox {box_name} de nouveau en ligne"),
+                )
         except Exception as ws_exc:
             logger.debug("WS publish failed (non-blocking) : %s", ws_exc)
 
